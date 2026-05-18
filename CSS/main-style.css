@@ -1,0 +1,1154 @@
+@import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Elms+Sans:wght@100..900&family=JetBrains+Mono:wght@100..800&family=Sono:wght,MONO@200..800,0.46&display=swap');
+@font-face {
+    font-family: 'circe-slab-a';
+    src: url("../Fonts/circe-slab_a-ultra-light.otf");
+}
+
+/* --- FONTS ---
+  font-family: "Elms Sans", sans-serif;
+  font-weight: 100 - 900;
+
+  font-family: "Courier Prime", monospace;
+  font-weight: 400 or 700;
+
+  font-family: "Sono", monospace;
+  font-weight: 200 - 800;
+  font-variation-settings: "MONO" 0.46;
+
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 100 - 800;
+*/
+
+* {
+    box-sizing: border-box;
+}
+
+:root {
+    --low-white: #fffc;
+    --background: #080808;
+
+    --button-width: 130px;
+    --button-height: 55px;
+    --button-padding: 12px 24px;
+    --button-slide-distance: 10rem;
+
+    --form-height: 600px;
+    --form-width: 500px;
+    --form-padding: 4rem;
+
+    --side-menu-width: 400px;
+}
+
+html, body {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    background: var(--background);
+    display: flex;
+    align-items: center;
+}
+
+h1 {
+    margin: 0;
+    color: #fff;
+    font-family: 'circe-slab-a';
+    font-style: normal;
+    font-weight: 100;
+    font-size: 4rem;
+}
+
+h2, h3, p, span {
+    margin: 0;
+    color: #fff;
+    font-family: 'Courier Prime', monospace;
+    font-weight: 100;
+}
+
+hr {
+    height: 1px;
+    margin: 0;
+    border: 0;
+    background-color: var(--low-white);
+    animation: bar-stretch 1s ease-in-out forwards;
+    transition: transform 0.5s ease;
+}
+
+header {
+    width: 100%;
+    padding: 2rem 2rem 2rem 3rem;
+    position: fixed;
+    top: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: linear-gradient(to bottom, #0008, #0000);
+    z-index: 2;
+}
+
+#aux-bar {
+    opacity: 0;
+    animation: none;
+    transition-delay: 0.1ms;
+}
+
+@keyframes bar-stretch {
+    0% { transform: scaleX(0); }
+    100% { transform: scaleX(1); }
+}
+
+@keyframes bar-up-a {
+    0% { transform: translateY(0) translateX(0) scale(1, 1) rotate(0); }
+    60% { transform: translateY(calc((var(--form-height) / -2) - 8px)) translateX(0) scale(1, 1) rotate(0); }
+    80% { transform: translateY(calc((var(--form-height) / -2) - 8px)) translateX(calc(var(--form-width) / 2)) scale(0.05, 1) rotate(0); }
+    100% { transform: translateY(calc((var(--form-height) / -2) - 8px)) translateX(calc(var(--form-width) / 2)) rotate(45deg) scale(0.05, 2); }
+}
+
+@keyframes bar-up-b {
+    0% { transform: translateY(0) translateX(0) scale(1, 1) rotate(0); opacity: 0; }
+    60% { transform: translateY(calc((var(--form-height) / -2) - 8px)) translateX(0) scale(1, 1) rotate(0); opacity: 0; }
+    80% { transform: translateY(calc((var(--form-height) / -2) - 8px)) translateX(calc(var(--form-width) / 2)) scale(0.05, 1) rotate(0); opacity: 0; }
+    100% { transform: translateY(calc((var(--form-height) / -2) - 8px)) translateX(calc(var(--form-width) / 2)) rotate(-45deg) scale(0.05, 2); opacity: 1; }
+}
+
+button {
+    width: var(--button-width);
+    height: var(--button-height);
+    margin-bottom: 1rem;
+    padding: var(--button-padding);
+    color: #fff;
+    border: 1px solid var(--low-white);
+    border-radius: 2rem;
+    background-color: transparent;
+    font-family: "Elms Sans", Verdana, Geneva, Tahoma, sans-serif;
+    font-size: 20px;
+    font-optical-sizing: auto;
+    font-style: normal;
+    font-weight: 200;
+    cursor: pointer;
+}
+
+svg {
+    width: 24px;
+    height: 24px;
+    margin-bottom: 1rem;
+    transition: transform 0.3s ease;
+    overflow: hidden;
+}
+
+#content {
+    width: 40rem;
+    margin: 0 auto;
+    position: relative;
+    color: #fff;
+    z-index: 1;
+    text-align: center;
+}
+
+#title {
+    padding-bottom: 1rem;
+    overflow: hidden;
+    mask: linear-gradient(to bottom, black 75%, transparent 100%);
+    transition: all 0.5s ease;
+}
+
+#title * {
+    animation: title-slide-up 1.5s ease-in-out forwards;
+}
+
+@keyframes title-slide-up {
+    0% { transform: translateY(8rem); }
+    25% { transform: translateY(8rem); }
+    100% { transform: translateY(0); }
+}
+
+#buttons-mask {
+    mask: linear-gradient(to top, black 75%, transparent 100%);
+}
+
+#buttons {
+    padding-top: 2rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 2rem;
+    z-index: 2;
+    animation: buttons-slide-down 2s ease-in-out forwards;
+}
+
+@keyframes buttons-slide-down {
+    0% { transform: translateY(calc(-1 * var(--button-slide-distance))); }
+    25% { transform: translateY(calc(-1 * var(--button-slide-distance))); }
+    100% { transform: translateY(0); }
+}
+
+#buttons div {
+    position: relative;
+}
+
+.overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    color: var(--background);
+    font-weight: 700;
+    z-index: 3;
+    transition: transform 0.3s ease, clip-path 0.5s ease;
+}
+
+#left .overlay {
+    clip-path: rect(0 100% 100% 100%);
+    box-shadow: 0 0 0 #0000;
+    background: linear-gradient(270deg, hsl(0, 100%, 90%), hsl(27, 100%, 90%), hsl(59, 100%, 90%), hsl(120, 100%, 90%), hsl(178, 100%, 90%), hsl(240, 100%, 90%), hsl(267, 100%, 90%), hsl(301, 100%, 90%), hsl(0, 100%, 90%), hsl(27, 100%, 90%), hsl(59, 100%, 90%), hsl(120, 100%, 90%));
+    background-size: 400%;
+    animation: rainbow-left 10s linear infinite;
+}
+
+#right .overlay {
+    clip-path: rect(0 0 100% 0);
+    box-shadow: 0 0 0 #0000;
+    background: linear-gradient(90deg, hsl(0, 100%, 90%), hsl(27, 100%, 90%), hsl(59, 100%, 90%), hsl(120, 100%, 90%), hsl(178, 100%, 90%), hsl(240, 100%, 90%), hsl(267, 100%, 90%), hsl(301, 100%, 90%), hsl(0, 100%, 90%), hsl(27, 100%, 90%), hsl(59, 100%, 90%), hsl(120, 100%, 90%));
+    background-size: 400%;
+    animation: rainbow-right 10s linear infinite;
+}
+
+@keyframes rainbow-left {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 100% 50%; }
+}
+
+@keyframes rainbow-right {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+#left:hover .overlay {
+    clip-path: rect(-20% 120% 120% -20%);
+    box-shadow: 0px 0px 10px #fff8;
+}
+
+#right:hover .overlay {
+    clip-path: rect(-20% 120% 120% -20%);
+    box-shadow: 0px 0px 10px #fff8;
+}
+
+@keyframes shake {
+    0% { transform: rotate(0deg); }
+    25% { transform: rotate(-5deg); }
+    50% { transform: rotate(5deg); }
+    75% { transform: rotate(-5deg); }
+    100% { transform: rotate(0deg); }
+}
+
+#close-button {
+    width: 0;
+    height: 0;
+    padding: 20px;
+    position: fixed;
+    top: calc(100vh / 2 - var(--form-height) / 2);
+    left: calc(50vw + var(--form-width) / 2);
+    transform: translate(-50%, -50%);
+    cursor: default;
+    opacity: 0;
+}
+
+form {
+    width: var(--button-width);
+    height: var(--button-height);
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    border: 1px solid var(--low-white);
+    border-radius: 2rem;
+    position: absolute;
+    opacity: 0;
+    transform: translateY(-85%);
+    will-change: left, top, transform, width, height;
+}
+
+.auth-form {
+    opacity: 1;
+    animation: form-open 1s ease-in-out 0s 1 normal forwards;
+}
+
+@keyframes form-open {
+    from {
+        width: var(--button-width);
+        height: var(--button-height);
+        padding: 0rem;
+        left: var(--start-left);
+        top:  var(--start-top);
+        transform: translate(inherit, inherit);
+        mask-image: radial-gradient(circle at 100% 0%,#0000 0px,#000f 1px,#000f 100%);
+    } to {
+        width: var(--form-width);
+        height: var(--form-height);
+        padding: 4rem;
+        left: 50%;
+        top:  50%;
+        transform: translate(-50%, -50%);
+        mask-image: radial-gradient(circle at 100% 0%,#0000,#0000 30px,#000f 31px,#000f 100%);
+    }
+}
+
+form label {
+    width: 0%;
+    margin-bottom: 2rem;
+    display: flex;
+    flex-direction: column;
+    font-family: "Elms Sans", Verdana, Geneva, Tahoma, sans-serif;
+    font-size: 18px;
+    text-align: left;
+    opacity: 0;
+}
+
+form label input {
+    margin-top: 0.5rem;
+    padding: var(--button-padding);
+    background-color: transparent;
+    border: 1px solid #fff;
+    border-radius: 2rem;
+    color: #fff;
+    font-family: "Elms Sans", Verdana, Geneva, Tahoma, sans-serif;
+    text-align: left;
+}
+
+@keyframes label-in {
+    from {
+        width: 0%;
+        opacity: 0;
+    } to {
+        width: 100%;
+        opacity: 1;
+    }
+}
+
+#submit-button {
+    position: absolute;
+    border: none;
+    text-align: center;
+    border-radius: 0;
+    background: linear-gradient(var(--low-white),var(--low-white)) center 85%;
+    background-size: 0% 1px;
+    background-repeat: no-repeat;
+    text-shadow: 0 0 0 #fff;
+    transition: all 0.45s;
+}
+
+#submit-button:not(:disabled):hover {
+    background-size: 70% 1px;
+    text-shadow: 0 0 10px #fff;
+}
+
+@keyframes form-open-submit {
+    from {
+        left: var(--start-left);
+        top: calc(inherit * 1px);
+        transform: translateX(0);
+    }
+    to {
+        left: 50%;
+        top: var(--end-top);
+        transform: translateX(-50%);
+    }
+}
+
+/* home.php */
+
+header div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+}
+
+header div button {
+    width: 48px;
+    height: 48px;
+    margin: 0;
+    padding: 0;
+    border: none;
+}
+
+header div button svg {
+    width: 48px;
+    height: 48px;
+    margin: 0;
+    padding: 0;
+}
+
+#no-characters {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+}
+
+#no-characters span {
+    color: #fff8;
+    font-size: 32px;
+    font-weight: 100;
+}
+
+#no-characters svg {
+    width: 300px;
+    height: 300px;
+}
+
+.animated-dash.cls-1, .animated-dash.cls-4 {
+    animation: dash-flow 5s linear infinite;
+}
+.animated-dash.cls-2 {
+    animation: dash-flow-circle 5s linear infinite;
+}
+
+@keyframes dash-flow {
+    from {
+        stroke-dashoffset: 0;
+    } to {
+        stroke-dashoffset: 97;
+    }
+}
+
+@keyframes dash-flow-circle {
+    from {
+        stroke-dashoffset: 0;
+    } to {
+        stroke-dashoffset: -105;
+    }
+}
+
+#side-menu {
+    --header-height: 110px;
+    width: var(--side-menu-width);
+    height: calc(910px - var(--header-height));
+    margin-top: var(--header-height);
+    padding: 0 2rem;
+    display: flex;
+    z-index: 2;
+}
+
+#side-menu-content h3 {
+    font-family: "Sono", monospace;
+    font-weight: 300;
+    font-size: 24px;
+}
+
+#side-menu-content hr {
+    height: 2px;
+    margin-top: 10px;
+    animation: none;
+    background-color: transparent;
+    background-image: linear-gradient(to right, var(--low-white) 50%, rgba(255, 255, 255, 0) 0%);
+    background-size: 10px 1px;
+    background-repeat: repeat-x;
+}
+
+#side-menu-content button {
+    width: 100%;
+    height: auto;
+    margin-top: 1rem;
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#side-menu-content p {
+    font-family: "Sono", monospace;
+    font-size: 18px;
+    text-align: center;
+    text-wrap: nowrap;
+}
+
+#side-menu-content svg {
+    margin: 0;
+}
+
+#side-menu-toggle {
+    width: 50px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    opacity: 0.8;
+}
+
+#side-menu-toggle div {
+    width: 1px;
+    height: 100%;
+    background-color: var(--low-white);
+}
+
+#side-menu-toggle button {
+    width: 32px;
+    height: 32px;
+    margin: -2px;
+    padding: 0;
+    border: none;
+    transition: transform 0.5s ease-in-out;
+    transform: rotate(180deg);
+}
+
+#side-menu-toggle button svg {
+    width: 32px;
+    height: 32px;
+    margin: 0;
+}
+
+/* --- NEW CHARACTER BUTTON HOVER --- */
+#create-character-btn .agent-card {
+    position: relative;
+    width: 100%;
+    margin-top: 1rem;
+}
+
+#create-character-btn button {
+    margin-top: 0 !important; /* Overrides the margin on the nested button */
+}
+
+#create-character-btn .overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    color: var(--background);
+    font-weight: 700;
+    z-index: 3;
+    transition: transform 0.3s ease, clip-path 0.5s ease;
+    clip-path: rect(0 0 100% 0);
+    box-shadow: 0 0 0 #0000;
+    background: linear-gradient(90deg, hsl(0, 100%, 90%), hsl(27, 100%, 90%), hsl(59, 100%, 90%), hsl(120, 100%, 90%), hsl(178, 100%, 90%), hsl(240, 100%, 90%), hsl(267, 100%, 90%), hsl(301, 100%, 90%), hsl(0, 100%, 90%), hsl(27, 100%, 90%), hsl(59, 100%, 90%), hsl(120, 100%, 90%));
+    background-size: 400%;
+    animation: rainbow-right 10s linear infinite;
+}
+
+#create-character-btn .overlay p {
+    color: var(--background);
+    font-weight: 700;
+}
+
+#create-character-btn:hover .overlay {
+    clip-path: rect(-20% 120% 120% -20%);
+    box-shadow: 0px 0px 10px #fff8;
+}
+
+/* --- SIDE MENU COLLAPSE LOGIC --- */
+#side-menu {
+    transition: transform 0.5s ease-in-out;
+    flex-shrink: 0; /* Prevents contents from squeezing */
+    will-change: transform;
+}
+
+#side-menu.collapsed {
+    /* Slides the menu left by 100%, but keeps the 50px toggle + 2rem padding visible */
+    transform: translateX(calc(-100% + 50px + 4rem));
+}
+
+#side-menu.collapsed #side-menu-toggle button {
+    /* Flips the arrow back to point right when collapsed */
+    transform: rotate(0deg); 
+}
+
+/* --- CHARACTER INITIALIZATION CARD --- */
+#init-card {
+    position: relative;
+    z-index: 1; /* Keep above nebula */
+    margin: 0 auto;
+    
+    /* REVISED: Transparent background, no blur */
+    background: transparent;
+    backdrop-filter: none;
+}
+
+.init-title {
+    font-family: "Sono", monospace;
+    font-size: 28px;
+    font-weight: 400;
+    text-align: center;
+    letter-spacing: 2px;
+    margin-bottom: 0.5rem;
+    color: #fff;
+}
+
+.init-subtitle {
+    font-family: "Courier Prime", monospace;
+    font-size: 14px;
+    color: #888;
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+/* Overriding the global form rules */
+form.init-form {
+    position: static;
+    width: 100%;
+    height: auto;
+    opacity: 1;
+    transform: none;
+    border: none;
+    padding: 0;
+    animation: none;
+    mask-image: none;
+    display: block;
+
+    width: 600px;
+    margin: 0 auto 40px auto;
+    padding: 3rem 4rem;
+    
+    /* REVISED: Brighter, solid glowing border */
+    border: 1px solid var(--low-white);    
+    border-radius: 1.5rem;
+    /* box-shadow: 0 0 15px rgba(255, 255, 255, 0.2); */
+}
+
+.init-section {
+    margin-bottom: 2.5rem;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 1rem;
+}
+
+.section-header.flex-between {
+    justify-content: space-between;
+}
+
+.section-header svg {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+
+.section-header span {
+    font-family: "Elms Sans", sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: var(--low-white);
+}
+
+.flex-row {
+    display: flex;
+    gap: 2rem;
+}
+
+/* Text Inputs */
+input.line-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 0;
+    padding: 0.5rem 0;
+    color: #fff;
+    font-family: "Courier Prime", monospace;
+    font-size: 16px;
+    transition: border-color 0.3s;
+    margin-top: 0; /* Reset global margin */
+}
+
+input.line-input:focus {
+    outline: none;
+    border-bottom: 1px solid #fff;
+}
+
+input.line-input::placeholder {
+    color: rgba(255, 255, 255, 0.3);
+    font-family: "Elms Sans", sans-serif;
+    font-size: 14px;
+    letter-spacing: 1px;
+}
+
+/* Segmented Pill Radio Buttons */
+.radio-pills {
+    display: flex;
+    gap: 1rem;
+}
+
+/* Override the global label styles for these pills */
+form.init-form .pill-label {
+    width: auto;
+    margin: 0;
+    opacity: 1;
+    animation: none;
+    flex: 1;
+}
+
+.pill-label input[type="radio"] {
+    display: none;
+}
+
+.pill-btn {
+    display: block;
+    text-align: center;
+    padding: 0.6rem 0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 2rem;
+    font-family: "Elms Sans", sans-serif;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.pill-label input[type="radio"]:checked + .pill-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border-color: #fff;
+}
+
+/* Range Slider */
+.age-display {
+    font-family: "Courier Prime", monospace;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.age-display span {
+    color: #fff;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+input.range-slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.2);
+    outline: none;
+    border-radius: 2px;
+    margin: 1rem 0 0.5rem 0;
+}
+
+input.range-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    cursor: pointer;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.range-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: "Courier Prime", monospace;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* Submit Area & Rainbow Hover Logic */
+.divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    margin: 2rem 0;
+    animation: none; /* Disable stretch animation from main CSS */
+}
+
+.init-submit-container {
+    position: relative;
+    display: block;
+    margin-left: auto;
+    width: auto;
+    overflow: hidden; /* For the masked swipe */
+}
+
+/* Base button styles, applied to both original and overlay */
+button.init-submit {
+    display: block;
+    width: 100%;
+    padding: 10px 24px;
+    border-radius: 2rem;
+    font-family: "Elms Sans", sans-serif;
+    font-size: 12px;
+    letter-spacing: 1px;
+    transition: all 0.3s ease;
+    background: transparent;
+    border: 1px solid var(--low-white);
+    color: #fff;
+    white-space: nowrap; /* Prevent text wrapping */
+    cursor: pointer;
+}
+
+/* Original button: border changes on hover of the container */
+.init-submit-container:hover .original {
+    border-color: #fff;
+}
+
+/* Overlay button: the one that will have the rainbow and the mask */
+.init-submit-container .overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
+    background: linear-gradient(90deg, hsl(0, 100%, 90%), hsl(27, 100%, 90%), hsl(59, 100%, 90%), hsl(120, 100%, 90%), hsl(178, 100%, 90%), hsl(240, 100%, 90%), hsl(267, 100%, 90%), hsl(301, 100%, 90%), hsl(0, 100%, 90%), hsl(27, 100%, 90%), hsl(59, 100%, 90%), hsl(120, 100%, 90%));
+    background-size: 400%;
+    animation: rainbow-right 10s linear infinite; /* Reuse animation from main.css */
+    color: var(--background); /* Use background color for dark text */
+    pointer-events: none; /* Let clicks pass through */
+    
+    /* NEW: The mask starts hidden and swipes left-to-right */
+    clip-path: rect(0 0 100% 0);
+    transition: clip-path 0.3s ease; /* Ensure smooth clip path transition */
+}
+
+/* Add the clip-path swipe on container hover */
+.init-submit-container:hover .overlay {
+    clip-path: rect(-20% 120% 120% -20%);
+    box-shadow: 0px 0px 10px #fff8;
+}
+
+/* --- AGENT SIDEBAR CARDS --- */
+#characters {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem; 
+}
+
+.agent-card {
+    width: 100%;
+    border-radius: 1rem;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: block !important;
+    align-items: flex-start !important;
+    text-align: left;
+}
+
+.agent-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Active State Styles */
+.agent-card.active {
+    border-left-color: #fff;
+    border-left: 2px solid transparent; 
+}
+
+.agent-card-header {
+    display: flex;
+    justify-content: space-between; /* Pushes ID to left, dot to right */
+    align-items: center; /* Vertically aligns them */
+    margin-bottom: 0.5rem;
+}
+
+.agent-id {
+    font-family: "Courier Prime", monospace;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin: 0; /* Overrides any global span/p margins */
+}
+
+/* The pulsing dot */
+.agent-pulse {
+    width: 8px;
+    height: 8px;
+    background-color: #fff !important; /* Force white, override black */
+    border-radius: 50%;
+    display: none;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+    animation: pulse-glow 2s infinite ease-in-out;
+}
+
+.agent-card.active .agent-pulse {
+    display: block;
+}
+
+@keyframes pulse-glow {
+    0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7); }
+    70% { box-shadow: 0 0 0 6px rgba(255, 255, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+.agent-name {
+    font-family: "Elms Sans", sans-serif;
+    font-size: 1.125rem;
+    color: #fff;
+    margin: 0 0 0.25rem 0 !important; /* Override global h3 margins */
+    font-weight: 400;
+}
+
+.agent-class {
+    font-family: "Courier Prime", monospace;
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: uppercase;
+    margin: 0 !important; /* Override global p margins */
+}
+
+/* --- MAIN PROFILE DISPLAY HEADER --- */
+#main-display {
+    height: 100%;
+    flex: 1;
+    padding: 5rem 4rem 3rem 0;
+    display: flex;
+    justify-content: flex-start;
+    flex-direction: column;
+    z-index: 3;
+}
+
+.profile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end; /* Aligns the bottom of the name with the bottom of the stats */
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px dashed rgba(255, 255, 252, 0.15); 
+}
+
+.sleek-title {
+    font-family: "Elms Sans", sans-serif;
+    font-size: 3rem;
+    font-weight: 300;
+    color: #fff;
+    margin: 0 0 0.75rem 0;
+    letter-spacing: 2px;
+    line-height: 1;
+}
+
+.profile-demographics {
+    display: flex;
+    gap: 1rem;
+}
+
+/* Soft, aerodynamic pills from your DESIGN.md specs */
+.sleek-pill {
+    font-family: "Courier Prime", monospace;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.7);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.5rem; 
+}
+
+.profile-sim-status {
+    display: flex;
+    gap: 2.5rem;
+    text-align: right;
+}
+
+.status-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.status-label {
+    font-family: "Courier Prime", monospace;
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.4);
+    letter-spacing: 0.15em;
+}
+
+.status-value {
+    font-family: "Courier Prime", monospace;
+    font-size: 1.15rem;
+    color: #fff;
+    font-weight: bold;
+}
+
+/* --- PROFILE BODY (NEEDS & EMOTIONS) --- */
+.profile-body {
+    display: flex;
+    gap: 6rem; /* Wide gap creates the feeling of two distinct panels without needing borders */
+    margin-top: 2rem;
+}
+
+.profile-section {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.section-title {
+    font-family: "Courier Prime", monospace;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.4);
+    letter-spacing: 0.25em;
+    margin: 0 0 2.5rem 0 !important;
+    text-transform: uppercase;
+    font-weight: normal;
+}
+
+/* --- HORIZONTAL NEEDS BARS --- */
+.needs-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.need-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.need-header {
+    display: flex;
+    justify-content: space-between;
+    font-family: "Courier Prime", monospace;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.8);
+    letter-spacing: 0.1em;
+}
+
+.need-bar-bg {
+    width: 100%;
+    height: 3px; /* Very thin for elegance */
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+}
+
+.need-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.8s ease;
+}
+
+/* --- VERTICAL EMOTIONS CHART --- */
+.emotions-chart {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    height: 180px; /* Fixed height container for the vertical bars to grow within */
+    padding-top: 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* Subtle ground-line */
+}
+
+.emotion-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    flex: 1;
+}
+
+.emotion-bar-bg {
+    width: 4px; /* Ultra-thin vertical bars */
+    height: 120px; /* Max height of the bar */
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 2px;
+    display: flex;
+    align-items: flex-end; /* Forces the inner fill to grow from bottom-up */
+}
+
+.emotion-bar-fill {
+    width: 100%;
+    border-radius: 2px;
+    background: #fff; 
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5); /* Subtle white glow */
+    transition: height 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.emotion-label {
+    font-family: "Courier Prime", monospace;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    /* This makes the text read vertically, adding a heavy sci-fi UI vibe */
+    writing-mode: vertical-rl; 
+    transform: rotate(180deg);
+}
+
+/* --- ACTIVITY LOG --- */
+.log-section {
+    margin-top: 3rem;
+    display: flex;
+    flex-direction: column;
+    /* This allows the container to flex and scroll properly if the screen is small */
+    flex: 1; 
+    min-height: 250px; 
+}
+
+.log-container {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* Custom Webkit Scrollbar for the Log */
+.log-container::-webkit-scrollbar {
+    width: 6px;
+}
+.log-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+.log-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+}
+.log-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.log-entry {
+    display: flex;
+    gap: 1rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.25rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-left: 2px solid transparent; /* Colored dynamically in JS */
+    align-items: flex-start;
+    transition: background 0.2s;
+}
+
+.log-entry:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.log-time {
+    font-family: "Courier Prime", monospace;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.4);
+    min-width: 75px;
+    margin-top: 2px; /* Aligns text with the description */
+}
+
+.log-desc {
+    font-family: "Elms Sans", sans-serif;
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.85);
+    line-height: 1.4;
+    font-weight: 300;
+}
+
+.log-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    margin-top: 1px;
+}

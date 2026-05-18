@@ -1,0 +1,54 @@
+<!-- <?php
+    session_start();
+    if (!empty($_SESSION['user_id'])) {
+        header("Location: home.php");
+        exit;
+    }
+?> -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dawnway Lab</title>
+    <link rel="stylesheet" href="CSS/main-style.css?v=2.0">
+    <link rel="stylesheet" href="CSS/nebula.css">
+    <script>
+        fetch('/api/me')
+            .then(response => response.json())
+            .then(data => {
+                if (data.authenticated) {
+                    window.location.href = '/home.html';
+                }
+            })
+            .catch(err => console.log("User is a guest, staying on index."));
+    </script>
+</head>
+<body>
+    <canvas id="nebula"></canvas>
+    <div id="content">
+        <div id="title">
+            <h2>Welcome to the</h2>
+            <h1>Dawnway Lab</h1>
+        </div>
+        <hr>
+        <hr id="aux-bar">
+        <button id="close-button" onclick="closeFormButton()" disabled></button>
+        <div id="buttons-mask">
+            <div id="buttons">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round" stroke="#CCCCCC" stroke-width="0.768"></g><g id="SVGRepo_iconCarrier"> <path d="M12 3C12 7.97056 16.0294 12 21 12C16.0294 12 12 16.0294 12 21C12 16.0294 7.97056 12 3 12C7.97056 12 12 7.97056 12 3Z" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"></path> </g></svg>
+                <div id="left">
+                    <button class="original" onclick="loginButton()">Log In</button>
+                    <button class="overlay">Log In</button>
+                </div>
+                <div id="right">
+                    <button class="original" onclick="signupButton()">Sign Up</button>
+                    <button class="overlay">Sign Up</button>
+                </div>
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round" stroke="#CCCCCC" stroke-width="0.768"></g><g id="SVGRepo_iconCarrier"> <path d="M12 3C12 7.97056 16.0294 12 21 12C16.0294 12 12 16.0294 12 21C12 16.0294 7.97056 12 3 12C7.97056 12 12 7.97056 12 3Z" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"></path> </g></svg>
+            </div>
+        </div>
+    </div>
+</body>
+<script src="JS/nebula.js"></script>
+</html>

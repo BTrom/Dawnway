@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dawnway Lab - Initialization</title>
+    <link rel="stylesheet" href="CSS/main-style.css">
+    <link rel="stylesheet" href="CSS/nebula.css">
+</head>
+<body>
+    <canvas id="nebula"></canvas>
+    
+    <header>
+        <h2>Dawnway Lab</h2>
+        <div>
+            <p>php</p>
+            <button>
+                <svg width="800px" height="800px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="9" r="3" stroke="#fffc" stroke-width="0.75"/><circle cx="12" cy="12" r="10" stroke="#fffc" stroke-width="0.75"/><path d="M17.9691 20C17.81 17.1085 16.9247 15 11.9999 15C7.07521 15 6.18991 17.1085 6.03076 20" stroke="#fffc" stroke-width="0.75" stroke-linecap="round"/></svg>
+            </button>
+            <button>
+                <svg width="800px" height="800px" viewBox="0 0 32 32" enable-background="new 0 0 32 32" id="Editable-line" version="1.1" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" fill="none"><circle cx="16" cy="16" fill="none" id="XMLID_224_" r="4" stroke="#fffc" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="1"/><path d=" M27.758,10.366l-1-1.732c-0.552-0.957-1.775-1.284-2.732-0.732L23.5,8.206C21.5,9.36,19,7.917,19,5.608V5c0-1.105-0.895-2-2-2h-2 c-1.105,0-2,0.895-2,2v0.608c0,2.309-2.5,3.753-4.5,2.598L7.974,7.902C7.017,7.35,5.794,7.677,5.242,8.634l-1,1.732 c-0.552,0.957-0.225,2.18,0.732,2.732L5.5,13.402c2,1.155,2,4.041,0,5.196l-0.526,0.304c-0.957,0.552-1.284,1.775-0.732,2.732 l1,1.732c0.552,0.957,1.775,1.284,2.732,0.732L8.5,23.794c2-1.155,4.5,0.289,4.5,2.598V27c0,1.105,0.895,2,2,2h2 c1.105,0,2-0.895,2-2v-0.608c0-2.309,2.5-3.753,4.5-2.598l0.526,0.304c0.957,0.552,2.18,0.225,2.732-0.732l1-1.732 c0.552-0.957,0.225-2.18-0.732-2.732L26.5,18.598c-2-1.155-2-4.041,0-5.196l0.526-0.304C27.983,12.546,28.311,11.323,27.758,10.366z " fill="none" id="XMLID_242_" stroke="#fffc" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="1"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <div id="init-card">
+        <h2 class="init-title">Create Character</h2>
+        <p class="init-subtitle">Customize biometrics for new agent.</p>
+
+        <form class="init-form" id="character-init-form">
+            
+            <div class="init-section">
+                <div class="section-header">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 18V17C7 14.2386 9.23858 12 12 12C14.7614 12 17 14.2386 17 17V18M12 12C14.2091 12 16 10.2091 16 8C16 5.79086 14.2091 4 12 4C9.79086 4 8 5.79086 8 8C8 10.2091 9.79086 12 12 12Z" stroke="#fffc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    <span>IDENTIFICATION</span>
+                </div>
+                <div class="flex-row">
+                    <input type="text" name="givenName" class="line-input" placeholder="Given Name" required>
+                    <input type="text" name="familyName" class="line-input" placeholder="Family Name" required>
+                </div>
+            </div>
+
+            <div class="init-section">
+                <div class="section-header">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="#fffc" stroke-width="1.5"/><circle cx="12" cy="12" r="4" stroke="#fffc" stroke-width="1.5"/></svg>
+                    <span>GENDER</span>
+                </div>
+                <div class="radio-pills">
+                    <label class="pill-label">
+                        <input type="radio" name="gender" value="male" checked>
+                        <span class="pill-btn">Male</span>
+                    </label>
+                    <label class="pill-label">
+                        <input type="radio" name="gender" value="female">
+                        <span class="pill-btn">Female</span>
+                    </label>
+                    <label class="pill-label">
+                        <input type="radio" name="gender" value="other">
+                        <span class="pill-btn">Other</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="init-section">
+                <div class="section-header flex-between">
+                    <div>
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 4H6M18 20H6M16 4V6.5C16 8 15 9.5 13.5 10.5L10.5 12.5C9 13.5 8 15 8 16.5V20M8 4V6.5C8 8 9 9.5 10.5 10.5L13.5 12.5C15 13.5 16 15 16 16.5V20" stroke="#fffc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <span>AGE</span>
+                    </div>
+                    <div class="age-display"><span id="age-val">24</span> CYCLES</div>
+                </div>
+                <input type="range" name="age" class="range-slider" id="age-slider" min="8" max="100" value="24">
+                <div class="range-labels">
+                    <span>8</span>
+                    <span>100</span>
+                </div>
+            </div>
+
+            <hr class="divider">
+
+            <div class="init-submit-container">
+                <button class="init-submit original">
+                    CREATE &rarr;
+                </button>
+                <button class="init-submit overlay">
+                    CREATE &rarr;
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script src="JS/nebula.js"></script>
+    <script>
+        // Update the age display as the slider moves
+        const slider = document.getElementById('age-slider');
+        const ageVal = document.getElementById('age-val');
+        const initForm = document.getElementById('character-init-form');
+
+        slider.addEventListener('input', function() {
+            ageVal.textContent = this.value;
+        });
+
+        initForm.addEventListener('submit', async (event) => {
+            event.preventDefault(); // Stops the page refresh!
+
+            // Gather the data using the 'name' attributes
+            const formData = new FormData(initForm);
+            const dataPayload = Object.fromEntries(formData.entries());
+
+            // Log it so you can see it in DevTools
+            console.log("Form data:", dataPayload);
+
+            try {
+                const response = await fetch('/api/creator', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(dataPayload)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    window.location.href = '/home.html'; // Redirect back to dashboard
+                } else {
+                    alert("Error: " + result.message);
+                }
+            } catch (error) {
+                console.error("Network error: ", error);
+            }
+        });
+    </script>
+</body>
+</html>

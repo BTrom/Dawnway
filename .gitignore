@@ -1,0 +1,6 @@
+backend/node_modules/*
+Fonts/*
+PHP/*
+.env
+start-server.ps1
+create_tables.sql

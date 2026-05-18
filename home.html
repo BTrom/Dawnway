@@ -1,0 +1,447 @@
+<!-- <?php
+    require_once "PHP/auth_check.php";
+?> -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dawnway Lab</title>
+    <link rel="stylesheet" href="CSS/main-style.css?v=4.1">
+    <link rel="stylesheet" href="CSS/nebula.css">
+    <script>
+        fetch('/api/me')
+            .then(response => {
+                if (!response.ok) throw new Error("Not logged in");
+                return response.json();
+            })
+            .then(data => {
+                if (data.authenticated) {
+                    
+                    // Function to safely inject the username
+                    const updateUsername = () => {
+                        const navName = document.getElementById('nav-username');
+                        if (navName) navName.textContent = data.username;
+                    };
+
+                    // If the HTML is still parsing, wait for it. Otherwise, run immediately!
+                    if (document.readyState === 'loading') {
+                        document.addEventListener('DOMContentLoaded', updateUsername);
+                    } else {
+                        updateUsername(); 
+                    }
+
+                } else {
+                    window.location.href = '/index.html'; 
+                }
+            })
+            .catch(() => {
+                window.location.href = '/index.html';
+            });
+    </script>
+</head>
+<body>
+    <canvas id="nebula"></canvas>
+    <header>
+        <h2>Dawnway Lab</h2>
+        <div>
+            <p id="nav-username">Loading...</p>
+            <button>
+                <svg width="800px" height="800px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="9" r="3" stroke="#fffc" stroke-width="0.75"/><circle cx="12" cy="12" r="10" stroke="#fffc" stroke-width="0.75"/><path d="M17.9691 20C17.81 17.1085 16.9247 15 11.9999 15C7.07521 15 6.18991 17.1085 6.03076 20" stroke="#fffc" stroke-width="0.75" stroke-linecap="round"/></svg>
+            </button>
+            <button>
+                <svg width="800px" height="800px" viewBox="0 0 32 32" enable-background="new 0 0 32 32" id="Editable-line" version="1.1" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" fill="none"><circle cx="16" cy="16" fill="none" id="XMLID_224_" r="4" stroke="#fffc" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="1"/><path d=" M27.758,10.366l-1-1.732c-0.552-0.957-1.775-1.284-2.732-0.732L23.5,8.206C21.5,9.36,19,7.917,19,5.608V5c0-1.105-0.895-2-2-2h-2 c-1.105,0-2,0.895-2,2v0.608c0,2.309-2.5,3.753-4.5,2.598L7.974,7.902C7.017,7.35,5.794,7.677,5.242,8.634l-1,1.732 c-0.552,0.957-0.225,2.18,0.732,2.732L5.5,13.402c2,1.155,2,4.041,0,5.196l-0.526,0.304c-0.957,0.552-1.284,1.775-0.732,2.732 l1,1.732c0.552,0.957,1.775,1.284,2.732,0.732L8.5,23.794c2-1.155,4.5,0.289,4.5,2.598V27c0,1.105,0.895,2,2,2h2 c1.105,0,2-0.895,2-2v-0.608c0-2.309,2.5-3.753,4.5-2.598l0.526,0.304c0.957,0.552,2.18,0.225,2.732-0.732l1-1.732 c0.552-0.957,0.225-2.18-0.732-2.732L26.5,18.598c-2-1.155-2-4.041,0-5.196l0.526-0.304C27.983,12.546,28.311,11.323,27.758,10.366z " fill="none" id="XMLID_242_" stroke="#fffc" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="1"/></svg>
+            </button>
+        </div>
+    </header>
+    <div id="side-menu">
+        <div id="side-menu-content">
+            <h3>Characters</h3>
+            <hr>
+            <div id="create-character-btn">
+                <button class="original">
+                    <p>Create Character</p>
+                    <svg width="256px" height="256px" viewBox="0 0 24.00 24.00" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 12H20M12 4V20" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </button>
+                <button class="overlay">
+                    <p>Create Character</p>
+                    <svg width="256px" height="256px" viewBox="0 0 24.00 24.00" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M4 12H20M12 4V20" stroke="var(--background)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>
+                </button>
+            </div>
+            <ul id="characters">
+            </ul>
+        </div>
+        <div id="side-menu-toggle">
+            <div></div>
+            <button>
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="#ffffff" stroke-width="1" stroke-miterlimit="10" stroke-linecap="round" stroke-linejoin="round"></path><path d="M10.74 15.53L14.26 12L10.74 8.46997" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            </button>
+            <div></div>
+        </div>
+    </div>
+    <div id="no-characters" style="display: none;">
+        <svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 800 800">
+            <defs>
+                <style>
+                    .cls-1,.cls-2,.cls-3,.cls-4,.cls-5{
+                        fill:none;
+                        stroke-linecap:round;
+                        stroke-miterlimit:10;
+                        stroke-width:20px;
+                    }.cls-1,.cls-2{
+                        stroke:#fff9;
+                    }.cls-1{
+                        stroke-dasharray:49.41 49.41;
+                    }.cls-2{
+                        stroke-dasharray:52.36 52.36;
+                    }.cls-3{
+                        stroke:url(#linear-gradient);
+                    }.cls-4{
+                        stroke-dasharray:48.22 48.22;
+                        stroke:url(#linear-gradient-2);
+                    }.cls-5{
+                        stroke:url(#linear-gradient-3);
+                    }
+                </style>
+                <linearGradient id="linear-gradient" x1="659.37" y1="743.33" x2="659.37" y2="473.33" gradientUnits="userSpaceOnUse">
+                    <stop offset="0" stop-color="#fff9"/>
+                    <stop offset="0.5" stop-color="#fff9"/>
+                    <stop offset="0.8" stop-color="#fff9" stop-opacity="0"/>
+                </linearGradient>
+                <linearGradient id="linear-gradient-2" x1="400" y1="743.33" x2="400" y2="473.33" xlink:href="#linear-gradient"/>
+                <linearGradient id="linear-gradient-3" x1="140.63" y1="743.33" x2="140.63" y2="473.33" xlink:href="#linear-gradient"/>
+            </defs>
+            <path class="cls-1 animated-dash" d="M641,293.39a30.17,30.17,0,0,0-36.49-29.5l-73.27,15.7c-4,.85-6.1,1.31-8.22,1.74a607.21,607.21,0,0,1-246,0c-2.12-.43-4.25-.89-8.2-1.74l-73.29-15.7A30.17,30.17,0,0,0,179.63,322l83.88,28,2.1.7c7.93,2.62,16.17,5.35,23,9.54A67.49,67.49,0,0,1,320,426.78c-1.08,7.9-4.21,16-7.22,23.79l-.8,2.07-48.08,125a27.89,27.89,0,0,0,50.25,23.84l60.76-106.33a28.92,28.92,0,0,1,50.22,0l60.76,106.33a27.89,27.89,0,0,0,50.25-23.84L488,452.64l-.8-2.07c-3-7.79-6.14-15.89-7.22-23.79a67.47,67.47,0,0,1,31.41-66.57c6.79-4.19,15-6.92,23-9.54l2.1-.7,83.88-28A30.18,30.18,0,0,0,641,293.39Z"/>
+            <circle class="cls-2 animated-dash" cx="400" cy="133.33" r="66.67" transform="translate(22.88 321.9) rotate(-45)"/>
+            <path class="cls-3 animated-dash" d="M648.46,483.33q11.6,5.84,21.82,12.19"/>
+            <path class="cls-4 animated-dash" d="M707.77,525.63c16.47,17.76,25.56,37.25,25.56,57.7,0,82.85-149.24,150-333.33,150s-333.33-67.15-333.33-150c0-26.9,15.74-52.16,43.31-74"/>
+            <path class="cls-5 animated-dash" d="M129.72,495.52q10.22-6.34,21.82-12.19"/>
+        </svg>
+        <span>| No characters |</span>
+    </div>
+    <div id="main-display" style="display: none;">
+        <div class="profile-header">
+            
+            <div class="profile-identity">
+                <h1 id="display-name" class="sleek-title">Awaiting Subject...</h1>
+                <div class="profile-demographics">
+                    <span id="display-gender" class="sleek-pill">-</span>
+                    <span id="display-age" class="sleek-pill">-</span>
+                </div>
+            </div>
+
+            <div class="profile-sim-status">
+                <div class="status-item">
+                    <span class="status-label">SYS.TICK</span>
+                    <span id="display-tick" class="status-value">--</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">LOCAL TIME</span>
+                    <span id="display-time" class="status-value">--:--</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">DATE</span>
+                    <span id="display-date" class="status-value">--</span>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="profile-body">
+        
+            <div class="profile-section needs-section">
+                <h3 class="section-title">CORE VITALS</h3>
+                <div id="needs-container" class="needs-grid"></div>
+            </div>
+
+            <div class="profile-section emotions-section">
+                <h3 class="section-title">NEURAL STATE</h3>
+                <div id="emotions-container" class="emotions-chart"></div>
+            </div>
+
+        </div>
+
+        <div class="log-section">
+            <h3 class="section-title">ACTIVITY LOG</h3>
+            <div id="event-log-container" class="log-container custom-scrollbar">
+                </div>
+        </div>
+        
+    </div>
+</body>
+<script src="JS/nebula.js"></script>
+<script>
+    // 1. Existing Auth Check
+    fetch('/api/me')
+        .then(response => {
+            if (!response.ok) throw new Error("Not logged in");
+            return response.json();
+        })
+        .then(data => {
+            if (data.authenticated) {
+                const userElement = document.getElementById('nav-username');
+                if (userElement) userElement.textContent = data.username;
+                
+                // 2. NEW: Now that we know they are logged in, fetch their agents
+                loadUserAgents();
+            } else {
+                window.location.href = '/index.html'; 
+            }
+        })
+        .catch(() => {
+            window.location.href = '/index.html';
+        });
+
+    // --- NEW FUNCTION TO LOAD AGENTS ---
+    async function loadUserAgents() {
+        try {
+            const response = await fetch('/api/agents');
+            const result = await response.json();
+            
+            if (result.success) {
+                const characterList = document.getElementById('characters');
+                characterList.innerHTML = ''; // Clear out any existing placeholder items
+                
+                if (result.agents.length === 0) {
+                    return;
+                }
+
+                // Loop through agents and build the cards
+                result.agents.forEach((agent, index) => {
+                    const li = document.createElement('li');
+                    const isActive = index === 0 ? 'active' : ''; 
+                    const subId = `SUB-${String(index + 1).padStart(2, '0')}`;
+                    
+                    li.className = `agent-card ${isActive}`;
+                    // ADD THIS ONCLICK:
+                    li.onclick = () => selectAgent(agent._id, li, subId);
+                    
+                    li.innerHTML = `
+                        <div class="agent-card-header">
+                            <span class="agent-id">${subId}</span>
+                            <span class="agent-pulse"></span>
+                        </div>
+                        <h3 class="agent-name">${agent.name} ${agent.surname}</h3>
+                        <p class="agent-class">${agent.gender} / ${agent.age} CYCLES</p>
+                    `;
+                    
+                    characterList.appendChild(li);
+
+                    // Auto-load the first agent on page load
+                    if (index === 0) selectAgent(agent._id, li, subId);
+
+                    // Make the card clickable
+                    li.addEventListener('click', () => {
+                        // Visually change active state
+                        document.querySelectorAll('.agent-card').forEach(c => c.classList.remove('active'));
+                        li.classList.add('active');
+                        
+                        // Fetch and display this specific agent
+                        fetchAgentDetails(agent._id);
+                    });
+
+                    characterList.appendChild(li);
+
+                    // Automatically load the first agent's details when the page loads
+                    if (index === 0) {
+                        fetchAgentDetails(agent._id);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error("Failed to load agents:", error);
+        }
+    }
+
+    async function fetchAgentDetails(agentId) {
+        try {
+            const response = await fetch(`/api/agents/${agentId}`);
+            const result = await response.json();
+            const logsContainer = document.getElementById('event-log-container');
+            logsContainer.innerHTML = '';
+
+            const defaultNeeds = { hunger: 100, thirst: 100, bladder: 100, sleep: 100, hygiene: 100 , health: 100 };
+            const defaultEmotions = { joy: 50, sadness: 50, anger: 50, fear: 50 };
+
+            if (result.success) {
+                // Un-hide the main display
+                document.getElementById('main-display').style.display = 'flex';
+                
+                // 1. Populate Identity
+                document.getElementById('display-name').textContent = `${result.agent.name} ${result.agent.surname}`;
+                document.getElementById('display-gender').textContent = result.agent.gender;
+                
+                // Format age (Assuming age is stored as a number)
+                document.getElementById('display-age').textContent = `${result.agent.age} CYCLES`;
+
+                // 2. Populate Snapshot / Sim Data
+                // If they just created the agent and have no snapshot yet, provide a fallback
+                const tick = result.snapshot ? result.snapshot.tick : 0;
+                const time = result.snapshot ? result.snapshot.inGameTime : "00:00"; 
+                const date = result.snapshot ? result.snapshot.inGameDate : "CYCLE 0";
+
+                document.getElementById('display-tick').textContent = tick;
+                document.getElementById('display-time').textContent = time;
+                document.getElementById('display-date').textContent = date;
+
+                const needs = (result.snapshot && result.snapshot.needs) ? result.snapshot.needs : defaultNeeds;
+                const emotions = (result.snapshot && result.snapshot.emotions) ? result.snapshot.emotions : defaultEmotions;
+
+                // Render Needs (Horizontal)
+                const needsContainer = document.getElementById('needs-container');
+                needsContainer.innerHTML = ''; // Clear previous
+                
+                for (const [key, value] of Object.entries(needs)) {
+                    // Determine color based on percentage
+                    let color = 'rgba(74, 222, 128, 1)'; // Green (Optimal)
+                    let glow = 'rgba(74, 222, 128, 0.4)';
+                    
+                    if (value < 60) {
+                        color = 'rgba(251, 191, 36, 1)'; // Yellow (Warning)
+                        glow = 'rgba(251, 191, 36, 0.4)';
+                    }
+                    if (value < 30) {
+                        color = 'rgba(248, 113, 113, 1)'; // Red (Critical)
+                        glow = 'rgba(248, 113, 113, 0.4)';
+                    }
+                    
+                    needsContainer.innerHTML += `
+                        <div class="need-row">
+                            <div class="need-header">
+                                <span>${key}</span>
+                                <span>${Math.round(value)}%</span>
+                            </div>
+                            <div class="need-bar-bg">
+                                <div class="need-bar-fill" style="width: ${value}%; background-color: ${color}; box-shadow: 0 0 10px ${glow};"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Render Emotions (Vertical)
+                const emotionsContainer = document.getElementById('emotions-container');
+                emotionsContainer.innerHTML = ''; // Clear previous
+
+                for (const [key, value] of Object.entries(emotions)) {
+                    emotionsContainer.innerHTML += `
+                        <div class="emotion-col">
+                            <span class="emotion-label">${key}</span>
+                            <div class="emotion-bar-bg">
+                                <div class="emotion-bar-fill" style="height: ${value}%;"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // --- 4. POPULATE EVENT LOGS ---
+                if (result.logs && result.logs.length > 0) {
+                    result.logs.forEach(log => {
+                        // Extract just the time (e.g., "14:32:05")
+                        // const time = new Date(log.timestamp).toLocaleTimeString([], { hour12: false });
+                        
+                        let iconSvg = '';
+                        let borderColor = 'rgba(255, 255, 255, 0.2)';
+                        
+                        // Assign colors and specific SVG icons based on the event_category enum
+                        switch(log.event_category) {
+                            case 'action':
+                                borderColor = '#60a5fa'; // Blue
+                                iconSvg = `<svg viewBox="0 0 24 24"><path fill="${borderColor}" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`; // Lightning bolt
+                                break;
+                            case 'milestone':
+                                borderColor = '#c084fc'; // Purple
+                                iconSvg = `<svg viewBox="0 0 24 24"><path fill="${borderColor}" d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`; // Star
+                                break;
+                            case 'learning':
+                                borderColor = '#34d399'; // Green
+                                iconSvg = `<svg viewBox="0 0 24 24"><path fill="${borderColor}" d="M12 2L2 12l10 10 10-10L12 2z"/></svg>`; // Diamond / Data node
+                                break;
+                            case 'death':
+                                borderColor = '#f87171'; // Red
+                                iconSvg = `<svg viewBox="0 0 24 24"><path fill="${borderColor}" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>`; // Warning circle
+                                break;
+                            default:
+                                iconSvg = `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#fff"/></svg>`; // Generic dot
+                        }
+                        
+                        logsContainer.innerHTML += `
+                            <div class="log-entry" style="border-left-color: ${borderColor}">
+                                <div class="log-icon">${iconSvg}</div>
+                                <span class="log-desc">${log.description}</span>
+                            </div>
+                        `;
+                        
+                        // logsContainer.innerHTML += `
+                        //     <div class="log-entry" style="border-left-color: ${borderColor}">
+                        //         <div class="log-icon">${iconSvg}</div>
+                        //         <span class="log-time">[${time}]</span>
+                        //         <span class="log-desc">${log.description}</span>
+                        //     </div>
+                        // `;
+                    });
+                } else {
+                    // Empty state
+                    logsContainer.innerHTML = '<div style="color: rgba(255, 255, 255, 0.3); text-align: center; padding: 2rem; font-family: \'Courier Prime\', monospace; letter-spacing: 2px;">NO LOG DATA AVAILABLE</div>';
+                }
+            }
+        } catch (error) {
+            console.error("Failed to load agent details:", error);
+        }
+    }
+
+    async function selectAgent(agentId, cardElement, subIdStr) {
+        // 1. Update active styling in the sidebar
+        document.querySelectorAll('.agent-card').forEach(card => card.classList.remove('active'));
+        if (cardElement) cardElement.classList.add('active');
+
+        try {
+            // 2. Fetch the data
+            const response = await fetch(`/api/agents/${agentId}`);
+            const result = await response.json();
+
+            if (result.success) {
+                const a = result.agent;
+                const snap = result.snapshot;
+                
+                // 3. Populate basic text
+                document.getElementById('panel-agent-name').textContent = `${a.name} ${a.surname}`;
+                document.getElementById('panel-agent-id').textContent = subIdStr;
+                document.getElementById('panel-agent-gender').textContent = a.gender;
+                document.getElementById('panel-agent-age').textContent = `${a.age} CYCLES`;
+
+                // 4. Populate Needs Bars
+                // If the agent doesn't have a snapshot yet, we default to 100%
+                const needs = snap && snap.needs ? snap.needs : { Energy: 100, Hunger: 100, Hydration: 100, Fun: 100 };
+                const needsContainer = document.getElementById('panel-agent-needs');
+                needsContainer.innerHTML = ''; // Clear old bars
+
+                for (const [needName, needValue] of Object.entries(needs)) {
+                    // Cap value between 0 and 100 for the width percentage
+                    const safeValue = Math.max(0, Math.min(100, needValue)); 
+                    
+                    needsContainer.innerHTML += `
+                        <div>
+                            <div class="flex justify-between font-label-mono text-xs mb-1">
+                                <span class="text-neutral-400 uppercase tracking-widest">${needName}</span>
+                                <span class="text-white">${safeValue}%</span>
+                            </div>
+                            <div class="need-bar-container">
+                                <div class="need-bar-fill" style="width: ${safeValue}%;"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // 5. Fade the panel in smoothly
+                document.getElementById('agent-data-panel').style.opacity = '1';
+            }
+        } catch (error) {
+            console.error("Failed to load agent details:", error);
+        }
+    }
+</script>
+</html>
