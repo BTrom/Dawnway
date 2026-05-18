@@ -18,7 +18,12 @@ const eventLogSchema = new mongoose.Schema({
     description: {
         type: String,
         required: true
-    }
+    },
+    action: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Action',
+        required: true
+    },
 });
 
 module.exports = mongoose.model('EventLog', eventLogSchema);

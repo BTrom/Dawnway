@@ -24,7 +24,7 @@ const agentSnapshotSchema = new mongoose.Schema({
         health:  { type: Number, default: 100 }
     },
     emotions: {
-        joy:     { type: Number, default: 0 },
+        joy:     { type: Number, default: 50 },
         sadness: { type: Number, default: 0 },
         anger:   { type: Number, default: 0 },
         fear:    { type: Number, default: 0 }

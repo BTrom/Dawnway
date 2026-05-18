@@ -9,6 +9,9 @@ const User = require('./models/User');
 const Agent = require('./models/Agent');
 const AgentSnapshot = require('./models/AgentSnapshot');
 const EventLog = require('./models/EventLog');
+const Action = require('./models/Action');
+const UnintentionalAction = require('./models/UnintentionalAction');
+const ObjectEntry = require('./models/ObjectEntry');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
