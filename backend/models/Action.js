@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const ActionSchema = new mongoose.Schema({
     object: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Objecttest',
+        ref: 'ObjectEntry',
         required: true
     },
     name: {

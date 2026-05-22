@@ -14,18 +14,15 @@ services:
     depends_on:
       - backend
 
-
-
   # 2. Socket.IO / Node.js Backend
   backend:
     image: node:18-alpine
     container_name: dawnway_backend
     working_dir: /app
-    # Maps a local 'backend' folder to the container to edit code live
     volumes:
       - ./backend:/app 
     ports:
-      - "3000:3000" # Exposing the Socket.IO backend
+      - "3000:3000"
     command: sh -c "npm install && npm run dev"
     environment:
       - MONGO_URI=mongodb://admin:${MONGO_PW}@mongodb:27017/dawnway_db?authSource=admin

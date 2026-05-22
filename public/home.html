@@ -7,8 +7,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dawnway Lab</title>
-    <link rel="stylesheet" href="CSS/main-style.css?v=4.1">
+    <link rel="stylesheet" href="CSS/main-style.css?v=4.6">
     <link rel="stylesheet" href="CSS/nebula.css">
+    <script src="/socket.io/socket.io.js"></script>
     <script>
         fetch('/api/me')
             .then(response => {
@@ -140,11 +141,11 @@
                     <span id="display-tick" class="status-value">--</span>
                 </div>
                 <div class="status-item">
-                    <span class="status-label">LOCAL TIME</span>
+                    <span class="status-label">GAME TIME</span>
                     <span id="display-time" class="status-value">--:--</span>
                 </div>
                 <div class="status-item">
-                    <span class="status-label">DATE</span>
+                    <span class="status-label">GAME DATE</span>
                     <span id="display-date" class="status-value">--</span>
                 </div>
             </div>
@@ -175,6 +176,119 @@
 </body>
 <script src="JS/nebula.js"></script>
 <script>
+    // --- SIMULATION TIME CALCULATOR ---
+    function formatSimulationTime(tick) {
+        tick = parseInt(tick) || 0;
+        // 1 tick = 10 minutes
+        const totalMinutes = tick * 10;
+        const minutes = totalMinutes % 60;
+        const totalHours = Math.floor(totalMinutes / 60);
+        const hours = totalHours % 24;
+        
+        // Custom Calendar: 30 days/month, 12 months/year
+        const totalDays = Math.floor(totalHours / 24);
+        const day = (totalDays % 30) + 1; // +1 because days start at 1, not 0
+        const totalMonths = Math.floor(totalDays / 30);
+        const month = (totalMonths % 12) + 1; // +1 because months start at 1
+        const year = Math.floor(totalMonths / 12) + 1; // Year 1 starts at tick 0
+
+        // Format strings with leading zeros (e.g., 05 instead of 5)
+        const hh = String(hours).padStart(2, '0');
+        const mm = String(minutes).padStart(2, '0');
+        const DD = String(day).padStart(2, '0');
+        const MM = String(month).padStart(2, '0');
+        const YYYY = String(year).padStart(4, '0');
+
+        return {
+            timeString: `${hh}:${mm}`,
+            dateString: `${DD}/${MM}/${YYYY}`
+        };
+    }
+    
+    // --- CONNECT TO WEBSOCKET ---
+    const socket = io();
+
+    socket.on('sim_update', (data) => {
+        // Run the math on the incoming tick
+        const simCalendar = formatSimulationTime(data.tick);
+
+        const tickEl = document.getElementById('display-tick');
+        const timeEl = document.getElementById('display-time');
+        const dateEl = document.getElementById('display-date');
+
+        if (tickEl) tickEl.textContent = data.tick;
+        if (timeEl) timeEl.textContent = simCalendar.timeString;
+        if (dateEl) dateEl.textContent = simCalendar.dateString;
+    });
+
+    // Listen for live need/emotion changes
+    socket.on('agent_update', (data) => {
+        // Only update the UI if the data belongs to the agent we are currently watching
+        if (data.agentId === activeAgentId) {
+            
+            // FIXED: Using the correct ID for your HTML structure!
+            const needsContainer = document.getElementById('needs-container'); 
+            
+            if (needsContainer) {
+                needsContainer.innerHTML = ''; 
+                for (const [key, value] of Object.entries(data.needs)) {
+                    const safeValue = Math.max(0, Math.min(100, value)); 
+                    
+                    // Dynamic colors based on your thresholds
+                    let color = 'rgba(74, 222, 128, 1)'; // Green
+                    let glow = 'rgba(74, 222, 128, 0.4)';
+                    if (safeValue < 60) { color = 'rgba(251, 191, 36, 1)'; glow = 'rgba(251, 191, 36, 0.4)'; }
+                    if (safeValue < 30) { color = 'rgba(248, 113, 113, 1)'; glow = 'rgba(248, 113, 113, 0.4)'; }
+
+                    // FIXED: Restored your custom CSS classes (need-row, need-bar-bg, etc.)
+                    needsContainer.innerHTML += `
+                        <div class="need-row">
+                            <div class="need-header">
+                                <span>${key}</span>
+                                <span>${Math.round(safeValue)}%</span>
+                            </div>
+                            <div class="need-bar-bg">
+                                <div class="need-bar-fill" style="width: ${safeValue}%; background-color: ${color}; box-shadow: 0 0 10px ${glow};"></div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        }
+    });
+
+    // Listen for new actions/milestones
+    socket.on('new_event_log', (log) => {
+        if (log.agent === activeAgentId) {
+            const logsContainer = document.getElementById('event-log-container');
+            if (logsContainer) {
+                const time = new Date(log.timestamp).toLocaleTimeString([], { hour12: false });
+                let iconSvg = '';
+                let borderColor = 'rgba(255, 255, 255, 0.2)';
+                
+                // Copy your exact switch(log.event_category) block here from fetchAgentDetails
+                switch(log.event_category) {
+                    case 'action':
+                        borderColor = '#60a5fa'; 
+                        iconSvg = `<svg viewBox="0 0 24 24"><path fill="${borderColor}" d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`;
+                        break;
+                    // ... include your other cases (milestone, death, etc.)
+                }
+
+                const newLogHtml = `
+                    <div class="log-entry" style="border-left-color: ${borderColor}">
+                        <div class="log-icon">${iconSvg}</div>
+                        <span class="log-time">[${time}]</span>
+                        <span class="log-desc">${log.description}</span>
+                    </div>
+                `;
+                
+                // Use insertAdjacentHTML to push the new log to the TOP of the list
+                logsContainer.insertAdjacentHTML('afterbegin', newLogHtml);
+            }
+        }
+    });
+
     // 1. Existing Auth Check
     fetch('/api/me')
         .then(response => {
@@ -196,6 +310,8 @@
             window.location.href = '/index.html';
         });
 
+    
+
     // --- NEW FUNCTION TO LOAD AGENTS ---
     async function loadUserAgents() {
         try {
@@ -214,25 +330,25 @@
                 result.agents.forEach((agent, index) => {
                     const li = document.createElement('li');
                     const isActive = index === 0 ? 'active' : ''; 
-                    const subId = `SUB-${String(index + 1).padStart(2, '0')}`;
+                    const charId = `ID-${String(index + 1).padStart(2, '0')}`;
                     
                     li.className = `agent-card ${isActive}`;
                     // ADD THIS ONCLICK:
-                    li.onclick = () => selectAgent(agent._id, li, subId);
+                    li.onclick = () => selectAgent(agent._id, li, charId);
                     
                     li.innerHTML = `
                         <div class="agent-card-header">
-                            <span class="agent-id">${subId}</span>
+                            <span class="agent-id">${charId}</span>
                             <span class="agent-pulse"></span>
                         </div>
                         <h3 class="agent-name">${agent.name} ${agent.surname}</h3>
-                        <p class="agent-class">${agent.gender} / ${agent.age} CYCLES</p>
+                        <p class="agent-class">${agent.gender} / ${agent.age}</p>
                     `;
                     
                     characterList.appendChild(li);
 
                     // Auto-load the first agent on page load
-                    if (index === 0) selectAgent(agent._id, li, subId);
+                    if (index === 0) selectAgent(agent._id, li, charId);
 
                     // Make the card clickable
                     li.addEventListener('click', () => {
@@ -257,12 +373,15 @@
         }
     }
 
+    let activeAgentId = null;
+    
     async function fetchAgentDetails(agentId) {
         try {
             const response = await fetch(`/api/agents/${agentId}`);
             const result = await response.json();
             const logsContainer = document.getElementById('event-log-container');
             logsContainer.innerHTML = '';
+            activeAgentId = agentId;
 
             const defaultNeeds = { hunger: 100, thirst: 100, bladder: 100, sleep: 100, hygiene: 100 , health: 100 };
             const defaultEmotions = { joy: 50, sadness: 50, anger: 50, fear: 50 };
@@ -276,17 +395,17 @@
                 document.getElementById('display-gender').textContent = result.agent.gender;
                 
                 // Format age (Assuming age is stored as a number)
-                document.getElementById('display-age').textContent = `${result.agent.age} CYCLES`;
+                document.getElementById('display-age').textContent = `${result.agent.age}`;
 
                 // 2. Populate Snapshot / Sim Data
-                // If they just created the agent and have no snapshot yet, provide a fallback
-                const tick = result.snapshot ? result.snapshot.tick : 0;
-                const time = result.snapshot ? result.snapshot.inGameTime : "00:00"; 
-                const date = result.snapshot ? result.snapshot.inGameDate : "CYCLE 0";
+                const tick = (result.snapshot && result.snapshot.tick) ? parseInt(result.snapshot.tick) || 0 : 0;
+                
+                // Generate the historical time/date purely from the snapshot's tick!
+                const historyCalendar = formatSimulationTime(tick);
 
                 document.getElementById('display-tick').textContent = tick;
-                document.getElementById('display-time').textContent = time;
-                document.getElementById('display-date').textContent = date;
+                document.getElementById('display-time').textContent = historyCalendar.timeString;
+                document.getElementById('display-date').textContent = historyCalendar.dateString;
 
                 const needs = (result.snapshot && result.snapshot.needs) ? result.snapshot.needs : defaultNeeds;
                 const emotions = (result.snapshot && result.snapshot.emotions) ? result.snapshot.emotions : defaultEmotions;
@@ -339,6 +458,7 @@
 
                 // --- 4. POPULATE EVENT LOGS ---
                 if (result.logs && result.logs.length > 0) {
+                    result.logs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
                     result.logs.forEach(log => {
                         // Extract just the time (e.g., "14:32:05")
                         // const time = new Date(log.timestamp).toLocaleTimeString([], { hour12: false });

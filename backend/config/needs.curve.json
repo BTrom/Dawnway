@@ -1,0 +1,237 @@
+{
+  "version": 1,
+  "curves": [
+    {
+      "name": "hunger",
+      "type": "float",
+      "preInfinity": "constant",
+      "postInfinity": "constant",
+      "keys": [
+        {
+          "time": 0,
+          "value": 0,
+          "interp": "constant",
+          "tangentMode": "auto"
+        },
+        {
+          "time": 0.25,
+          "value": 0,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentOut": {
+            "dx": 0.1,
+            "dy": 0
+          }
+        },
+        {
+          "time": 0.5,
+          "value": 1,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentIn": {
+            "dx": -0.1,
+            "dy": 0
+          },
+          "tangentOut": {
+            "dx": 0.2,
+            "dy": 0
+          }
+        },
+        {
+          "time": 0.8,
+          "value": 0.1,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentOut": {
+            "dx": 0.2,
+            "dy": 0
+          },
+          "tangentIn": {
+            "dx": -0.3,
+            "dy": 0
+          }
+        },
+        {
+          "time": 1,
+          "value": 0.9,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentIn": {
+            "dx": 0,
+            "dy": -0.2
+          }
+        }
+      ],
+      "visible": true
+    },
+    {
+      "name": "thirst",
+      "type": "float",
+      "preInfinity": "constant",
+      "postInfinity": "constant",
+      "keys": [
+        {
+          "time": 0,
+          "value": 0,
+          "interp": "bezier",
+          "tangentMode": "auto"
+        },
+        {
+          "time": 0.2,
+          "value": 0,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentIn": {
+            "dx": -0.1,
+            "dy": 0
+          },
+          "tangentOut": {
+            "dx": 0.3,
+            "dy": 0
+          }
+        },
+        {
+          "time": 1,
+          "value": 1,
+          "interp": "bezier",
+          "tangentMode": "auto"
+        }
+      ],
+      "visible": false
+    },
+    {
+      "name": "bladder",
+      "type": "float",
+      "preInfinity": "constant",
+      "postInfinity": "constant",
+      "keys": [
+        {
+          "time": 0,
+          "value": 0,
+          "interp": "bezier",
+          "tangentMode": "auto"
+        },
+        {
+          "time": 0.4,
+          "value": 0,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentOut": {
+            "dx": 0.4,
+            "dy": 0
+          }
+        },
+        {
+          "time": 1,
+          "value": 1,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentIn": {
+            "dx": -0.1,
+            "dy": 0
+          }
+        }
+      ],
+      "visible": false,
+      "locked": false
+    },
+    {
+      "name": "sleep",
+      "type": "float",
+      "preInfinity": "constant",
+      "postInfinity": "constant",
+      "keys": [
+        {
+          "time": 0,
+          "value": 0,
+          "interp": "linear",
+          "tangentMode": "user",
+          "tangentOut": {
+            "dx": 0,
+            "dy": 0
+          }
+        },
+        {
+          "time": 0.05,
+          "value": 0,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentIn": {
+            "dx": 0,
+            "dy": 0
+          }
+        },
+        {
+          "time": 0.5,
+          "value": 0.85,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentIn": {
+            "dx": -0.272,
+            "dy": -0.26
+          },
+          "tangentOut": {
+            "dx": 0.095,
+            "dy": 0.0925
+          }
+        },
+        {
+          "time": 0.75,
+          "value": 1,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentIn": {
+            "dx": -0.05,
+            "dy": 0
+          }
+        },
+        {
+          "time": 1,
+          "value": 1,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentIn": {
+            "dx": -0.3,
+            "dy": 0
+          }
+        }
+      ],
+      "visible": false
+    },
+    {
+      "name": "hygiene",
+      "type": "float",
+      "preInfinity": "constant",
+      "postInfinity": "constant",
+      "keys": [
+        {
+          "time": 0,
+          "value": 0,
+          "interp": "linear",
+          "tangentMode": "auto"
+        },
+        {
+          "time": 0.25,
+          "value": 0,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentOut": {
+            "dx": 0.75,
+            "dy": 0
+          }
+        },
+        {
+          "time": 1,
+          "value": 1,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentIn": {
+            "dx": -0.1,
+            "dy": 0
+          }
+        }
+      ],
+      "visible": false
+    }
+  ]
+}

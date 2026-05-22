@@ -15,6 +15,10 @@ const agentSnapshotSchema = new mongoose.Schema({
         required: true,
         default: Date.now
     },
+    tick: {
+        type: Number,
+        required: true
+    },
     needs: {
         hunger:  { type: Number, default: 100 },
         thirst:  { type: Number, default: 100 },

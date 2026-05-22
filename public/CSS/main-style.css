@@ -507,11 +507,10 @@ header div button svg {
 #create-character-btn .agent-card {
     position: relative;
     width: 100%;
-    margin-top: 1rem;
 }
 
 #create-character-btn button {
-    margin-top: 0 !important; /* Overrides the margin on the nested button */
+    margin-top: 1.5rem !important; /* Overrides the margin on the nested button */
 }
 
 #create-character-btn .overlay {
@@ -825,6 +824,7 @@ button.init-submit {
 
 .agent-card {
     width: 100%;
+    padding: 1rem;
     border-radius: 1rem;
     background: rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -885,18 +885,19 @@ button.init-submit {
 
 .agent-name {
     font-family: "Elms Sans", sans-serif;
-    font-size: 1.125rem;
+    font-size: 1.125rem !important;
     color: #fff;
-    margin: 0 0 0.25rem 0 !important; /* Override global h3 margins */
+    margin: 0 0 0.25rem 0 !important;
     font-weight: 400;
 }
 
 .agent-class {
+    margin: 0 !important;
     font-family: "Courier Prime", monospace;
-    font-size: 0.875rem;
+    font-size: 0.875rem !important;
     color: rgba(255, 255, 255, 0.6);
     text-transform: uppercase;
-    margin: 0 !important; /* Override global p margins */
+    text-align: left !important;
 }
 
 /* --- MAIN PROFILE DISPLAY HEADER --- */
