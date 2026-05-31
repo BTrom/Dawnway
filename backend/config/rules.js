@@ -4,8 +4,7 @@ const TICKS_PER_HOUR = 3600 / SECONDS_PER_TICK;
 const ruleSet = {
     needs: {
         hunger: {
-            priority: 0,
-            
+            priority: 3,
             thresholds: [
                 { threshold: 75, rate: -2.08  / TICKS_PER_HOUR, urgency: 0, hpDecay: 0 },
                 { threshold: 40, rate: -0.94  / TICKS_PER_HOUR, urgency: 0, hpDecay: 0 },
@@ -15,6 +14,7 @@ const ruleSet = {
             ]
         },
         thirst: {
+            priority: 5,
             thresholds: [
                 { threshold: 80, rate: -2.5 / TICKS_PER_HOUR, urgency: 0, hpDecay: 0 },
                 { threshold: 50, rate: -1.8 / TICKS_PER_HOUR, urgency: 0, hpDecay: -0.5 / TICKS_PER_HOUR },
@@ -24,6 +24,7 @@ const ruleSet = {
             ]
         },
         bladder: {
+            priority: 4,
             thresholds: [
                 { threshold: 75, rate: -10 / TICKS_PER_HOUR, urgency: 0, hpDecay: 0 },
                 { threshold: 40, rate: -10 / TICKS_PER_HOUR, urgency: 0, hpDecay: 0 },
@@ -32,6 +33,7 @@ const ruleSet = {
             ]
         },
         hygiene: {
+            priority: 1,
             thresholds: [
                 { threshold: 75, rate: -0.26  / TICKS_PER_HOUR, urgency: 0, hpDecay: 0 },
                 { threshold: 40, rate: -0.09  / TICKS_PER_HOUR, urgency: 0, hpDecay: 0 },
@@ -40,6 +42,7 @@ const ruleSet = {
             ]
         },
         sleep: {
+            priority: 2,
             thresholds: [
                 { threshold: 80, rate: -1.25 / TICKS_PER_HOUR, urgency: 0, hpDecay: 0 },
                 { threshold: 50, rate: -1.5  / TICKS_PER_HOUR, urgency: 0, hpDecay: -0.1 / TICKS_PER_HOUR },

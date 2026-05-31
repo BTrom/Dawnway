@@ -23,6 +23,10 @@ const userSchema = new mongoose.Schema({
     character_limit: {
         type: Number,
         default: 3
+    },
+    admin_privileges: {
+        type: Boolean,
+        default: false
     }
 });
 

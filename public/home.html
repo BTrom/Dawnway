@@ -7,7 +7,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dawnway Lab</title>
-    <link rel="stylesheet" href="CSS/main-style.css?v=4.6">
+    <link rel="stylesheet" href="CSS/main-style.css?v=4.9">
     <link rel="stylesheet" href="CSS/nebula.css">
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -149,21 +149,17 @@
                     <span id="display-date" class="status-value">--</span>
                 </div>
             </div>
-
         </div>
 
         <div class="profile-body">
-        
             <div class="profile-section needs-section">
                 <h3 class="section-title">CORE VITALS</h3>
                 <div id="needs-container" class="needs-grid"></div>
             </div>
-
             <div class="profile-section emotions-section">
                 <h3 class="section-title">NEURAL STATE</h3>
                 <div id="emotions-container" class="emotions-chart"></div>
             </div>
-
         </div>
 
         <div class="log-section">
@@ -171,8 +167,38 @@
             <div id="event-log-container" class="log-container custom-scrollbar">
                 </div>
         </div>
-        
     </div>
+
+    <div id="admin-panel" style="display: none;">
+    <button id="admin-toggle">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path id="admin-arrow" d="M15 18l-6-6 6-6" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </button>
+    <div class="admin-controls">
+        <button id="btn-play-pause" class="admin-round-item" title="Play / Pause">
+            <svg id="icon-play" viewBox="0 0 24 24" fill="#fff" style="display: none;"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="icon-pause" viewBox="0 0 24 24" fill="#fff" style="display: none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        </button>
+        <div class="admin-round-item" title="Set Tick">
+            <input type="number" id="input-set-tick" class="admin-num-input" placeholder="0">
+        </div>
+        <div class="admin-round-item" title="Set Speed (ms)">
+            <input type="number" id="input-set-speed" class="admin-num-input" placeholder="ms">
+        </div>
+        <div class="admin-round-item" title="Fast Forward">
+            <input type="number" id="input-fast-forward" class="admin-num-input" placeholder="ticks">
+        </div>
+        <div class="admin-round-item" title="Bulk Create">
+            <input type="number" id="input-bulk-create" class="admin-num-input" placeholder="amount">
+        </div>
+        <button id="btn-bulk-delete" class="admin-round-item" title="Bulk Delete">
+            <svg x="0px" y="0px" viewBox="0 0 64 64" style="enable-background:new 0 0 64 64; fill:#FFFFFF; stroke:#FFFFFF; stroke-width:0.8; stroke-miterlimit:10; padding: 4px;">
+                <path class="st0" d="M56,64l8-8L40,32L64,8l-8-8L32,24L8,0L0,8l24,24L0,56l8,8l24-24L56,64z"/>
+            </svg>
+        </button>
+    </div>
+</div>
 </body>
 <script src="JS/nebula.js"></script>
 <script>
@@ -219,6 +245,11 @@
         if (tickEl) tickEl.textContent = data.tick;
         if (timeEl) timeEl.textContent = simCalendar.timeString;
         if (dateEl) dateEl.textContent = simCalendar.dateString;
+
+        // Update Admin Tick input (only if they aren't actively typing in it)
+        if (document.getElementById('input-set-tick') && !isTickInputFocused) {
+            document.getElementById('input-set-tick').value = data.tick;
+        }
     });
 
     // Listen for live need/emotion changes
@@ -232,13 +263,20 @@
             if (needsContainer) {
                 needsContainer.innerHTML = ''; 
                 for (const [key, value] of Object.entries(data.needs)) {
-                    const safeValue = Math.max(0, Math.min(100, value)); 
+                    const safeValue = Math.max(0, Math.min(100, value));
+                    const urgency = data.urgencies[key] || 0;
+                    const priority = data.priorities && data.priorities[key] !== undefined ? data.priorities[key] : 1;
                     
                     // Dynamic colors based on your thresholds
                     let color = 'rgba(74, 222, 128, 1)'; // Green
                     let glow = 'rgba(74, 222, 128, 0.4)';
                     if (safeValue < 60) { color = 'rgba(251, 191, 36, 1)'; glow = 'rgba(251, 191, 36, 0.4)'; }
                     if (safeValue < 30) { color = 'rgba(248, 113, 113, 1)'; glow = 'rgba(248, 113, 113, 0.4)'; }
+
+                    // Apply your math for the 1px bar
+                    const urgencyWidth = urgency * 100;
+                    const urgencyOpacity = 0.5 + (urgency * 0.5);
+                    const finalUrgency = urgency * priority;
 
                     // FIXED: Restored your custom CSS classes (need-row, need-bar-bg, etc.)
                     needsContainer.innerHTML += `
@@ -249,6 +287,14 @@
                             </div>
                             <div class="need-bar-bg">
                                 <div class="need-bar-fill" style="width: ${safeValue}%; background-color: ${color}; box-shadow: 0 0 10px ${glow};"></div>
+                            </div>
+                            <div style="display: flex; align-items: center; opacity: ${urgencyOpacity}; margin-top: -0.25rem;">
+                                <div style="flex-grow: 1; margin-right: 10px; height: 1px; background-color: rgba(0,0,0,0.35);">
+                                    <div style="width: ${urgencyWidth}%; height: 1px; background-color: #ff6464;"></div>
+                                </div>
+                                <div style="width: 70px; text-align: right; font-family: monospace; font-size: 0.65rem; color: #ffffff; letter-spacing: 0.5px; opacity: ${urgencyOpacity};">
+                                    ${priority.toFixed(1)}x : ${finalUrgency.toFixed(2)}
+                                </div>
                             </div>
                         </div>
                     `;
@@ -289,7 +335,19 @@
         }
     });
 
-    // 1. Existing Auth Check
+    socket.on('bulk_agents_added', () => {
+        loadUserAgents(); // Refresh the list automatically!
+    });
+
+    socket.on('bulk_agents_removed', () => {
+        loadUserAgents(); 
+        document.getElementById('main-display').style.display = 'none'; // Hide the display in case the active agent was deleted
+    });
+
+    // Global state trackers for the UI
+    let isPaused = false;
+    let isTickInputFocused = false;
+
     fetch('/api/me')
         .then(response => {
             if (!response.ok) throw new Error("Not logged in");
@@ -300,7 +358,17 @@
                 const userElement = document.getElementById('nav-username');
                 if (userElement) userElement.textContent = data.username;
                 
-                // 2. NEW: Now that we know they are logged in, fetch their agents
+                if (data.admin_privileges) {
+                    document.getElementById('admin-panel').style.display = 'flex';
+                    
+                    isPaused = data.simPaused;
+                    updatePlayPauseIcon();
+                    document.getElementById('input-set-tick').value = data.simTick;
+                    document.getElementById('input-set-speed').value = data.currentInterval;
+
+                    initAdminPanel();
+                }
+                
                 loadUserAgents();
             } else {
                 window.location.href = '/index.html'; 
@@ -311,6 +379,144 @@
         });
 
     
+
+    // Admin Panel Functions
+    function initAdminPanel() {
+        const panel = document.getElementById('admin-panel');
+        const toggleBtn = document.getElementById('admin-toggle');
+        const playPauseBtn = document.getElementById('btn-play-pause');
+        const tickInput = document.getElementById('input-set-tick');
+        const speedInput = document.getElementById('input-set-speed');
+        const fastForwardInput = document.getElementById('input-fast-forward');
+        const bulkCreateInput = document.getElementById('input-bulk-create');
+        const bulkDeleteBtn = document.getElementById('btn-bulk-delete');
+
+        // 1. Toggle Slide
+        toggleBtn.addEventListener('click', () => panel.classList.toggle('open'));
+
+        // Track if user is typing so we don't overwrite their input with Socket data
+        tickInput.addEventListener('focus', () => isTickInputFocused = true);
+        tickInput.addEventListener('blur', () => isTickInputFocused = false);
+
+        // 2. Play / Pause
+        playPauseBtn.addEventListener('click', async () => {
+            const action = isPaused ? 'resume' : 'pause';
+            await sendAdminCommand(action);
+            isPaused = !isPaused;
+            updatePlayPauseIcon();
+        });
+
+        // 3. Set Tick (Enter key)
+        tickInput.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                const val = parseInt(tickInput.value);
+                if (!isNaN(val)) {
+                    await sendAdminCommand('set_tick', val);
+                    tickInput.blur(); // Remove focus after submit
+                }
+            }
+        });
+
+        // 4. Set Speed (Enter key)
+        speedInput.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                const val = parseInt(speedInput.value);
+                if (!isNaN(val)) {
+                    await sendAdminCommand('set_speed', val);
+                    speedInput.blur();
+                }
+            }
+        });
+
+        // 5. Fast Forward (Enter key)
+        fastForwardInput.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                const val = parseInt(fastForwardInput.value);
+                if (!isNaN(val)) {
+                    await sendAdminCommand('fast_forward', val);
+                    fastForwardInput.blur();
+                }
+            }
+        });
+
+        // 6. Bulk Create (Enter key)
+        bulkCreateInput.addEventListener('keydown', async (e) => {
+            if (e.key === 'Enter') {
+                const val = parseInt(bulkCreateInput.value);
+                if (!isNaN(val)) {
+                    await generateBulkAgents(val);
+                    bulkCreateInput.blur();
+                }
+            }
+        });
+
+        // 7. Bulk Delete
+        bulkDeleteBtn.addEventListener('click', async () => {
+            await cleanBulkAgents();
+        });
+    }
+
+    async function sendAdminCommand(action, value = null) {
+        try {
+            const payload = { action };
+            if (value !== null) payload.value = value;
+
+            await fetch('/api/sim/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+        } catch (err) {
+            console.error("Admin command failed", err);
+        }
+    }
+
+    function updatePlayPauseIcon() {
+        document.getElementById('icon-play').style.display = isPaused ? 'block' : 'none';
+        document.getElementById('icon-pause').style.display = isPaused ? 'none' : 'block';
+    }
+
+    async function generateBulkAgents(amount) {
+        const inputEl = document.getElementById('input-bulk-create');
+        inputEl.disabled = true;
+
+        try {
+            const res = await fetch('/api/agents/bulk', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount })
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                console.log(data.message); // Success! Socket will handle the UI refresh.
+                inputEl.value = ''; // Clear the input
+            } else {
+                alert("Error: " + data.message);
+            }
+        } catch(e) {
+            console.error("Error generating agents:", e);
+        }
+        
+        inputEl.disabled = false; // Re-enable
+    }
+
+    async function cleanBulkAgents() {
+        if (!confirm("Are you sure? This will permanently delete all bulk-generated agents and their logs.")) return;
+        
+        try {
+            const res = await fetch('/api/agents/bulk', { method: 'DELETE' });
+            const data = await res.json();
+            
+            if (data.success) {
+                console.log(data.message);
+            }
+        } catch(e) {
+            console.error("Error cleaning up:", e);
+        }
+    }
+
+
 
     // --- NEW FUNCTION TO LOAD AGENTS ---
     async function loadUserAgents() {
@@ -413,6 +619,8 @@
                 // Render Needs (Horizontal)
                 const needsContainer = document.getElementById('needs-container');
                 needsContainer.innerHTML = ''; // Clear previous
+                const urgencies = result.urgencies || {};
+                const priorities = result.priorities || {};
                 
                 for (const [key, value] of Object.entries(needs)) {
                     // Determine color based on percentage
@@ -427,6 +635,14 @@
                         color = 'rgba(248, 113, 113, 1)'; // Red (Critical)
                         glow = 'rgba(248, 113, 113, 0.4)';
                     }
+
+                    const safeValue = Math.max(0, Math.min(100, value));
+                    const urgency = urgencies[key] || 0;
+                    const priority = priorities[key] !== undefined ? priorities[key] : 1;
+
+                    const urgencyWidth = urgency * 100;
+                    const urgencyOpacity = 0.5 + (urgency * 0.5);
+                    const finalUrgency = urgency * priority;
                     
                     needsContainer.innerHTML += `
                         <div class="need-row">
@@ -436,6 +652,14 @@
                             </div>
                             <div class="need-bar-bg">
                                 <div class="need-bar-fill" style="width: ${value}%; background-color: ${color}; box-shadow: 0 0 10px ${glow};"></div>
+                            </div>
+                            <div style="display: flex; align-items: center; opacity: ${urgencyOpacity}; margin-top: -0.25rem;">
+                                <div style="flex-grow: 1; margin-right: 10px; height: 1px; background-color: rgba(0,0,0,0.35);">
+                                    <div style="width: ${urgencyWidth}%; height: 1px; background-color: #ff6464;"></div>
+                                </div>
+                                <div style="width: 70px; text-align: right; font-family: monospace; font-size: 0.65rem; color: #ffffff; letter-spacing: 0.5px; opacity: ${urgencyOpacity};">
+                                    ${priority.toFixed(1)}x : ${finalUrgency.toFixed(2)}
+                                </div>
                             </div>
                         </div>
                     `;

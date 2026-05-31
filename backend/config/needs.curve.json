@@ -14,12 +14,12 @@
           "tangentMode": "auto"
         },
         {
-          "time": 0.25,
+          "time": 0.1,
           "value": 0,
           "interp": "bezier",
           "tangentMode": "user",
           "tangentOut": {
-            "dx": 0.1,
+            "dx": 0.2,
             "dy": 0
           }
         },
@@ -43,7 +43,7 @@
           "interp": "bezier",
           "tangentMode": "user",
           "tangentOut": {
-            "dx": 0.2,
+            "dx": 0.19,
             "dy": 0
           },
           "tangentIn": {
@@ -52,14 +52,20 @@
           }
         },
         {
-          "time": 1,
+          "time": 0.99,
           "value": 0.9,
-          "interp": "bezier",
+          "interp": "linear",
           "tangentMode": "user",
           "tangentIn": {
             "dx": 0,
             "dy": -0.2
           }
+        },
+        {
+          "time": 1,
+          "value": 0.9,
+          "interp": "linear",
+          "tangentMode": "auto"
         }
       ],
       "visible": true
@@ -97,7 +103,7 @@
           "tangentMode": "auto"
         }
       ],
-      "visible": false
+      "visible": true
     },
     {
       "name": "bladder",
@@ -132,7 +138,7 @@
           }
         }
       ],
-      "visible": false,
+      "visible": true,
       "locked": false
     },
     {
@@ -196,7 +202,7 @@
           }
         }
       ],
-      "visible": false
+      "visible": true
     },
     {
       "name": "hygiene",
@@ -228,6 +234,95 @@
           "tangentIn": {
             "dx": -0.1,
             "dy": 0
+          }
+        }
+      ],
+      "visible": true
+    },
+    {
+      "name": "circadian",
+      "type": "float",
+      "preInfinity": "cycle",
+      "postInfinity": "cycle",
+      "keys": [
+        {
+          "time": 0,
+          "value": 1.75,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentOut": {
+            "dx": 0.5,
+            "dy": 0.15
+          }
+        },
+        {
+          "time": 2.2,
+          "value": 2,
+          "interp": "bezier",
+          "tangentMode": "aligned",
+          "tangentIn": {
+            "dx": -1,
+            "dy": 0
+          },
+          "tangentOut": {
+            "dx": 3.5,
+            "dy": 0
+          }
+        },
+        {
+          "time": 9.2,
+          "value": 0.6,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentIn": {
+            "dx": -1.5,
+            "dy": 0
+          },
+          "tangentOut": {
+            "dx": 2.5,
+            "dy": 0
+          }
+        },
+        {
+          "time": 14.2,
+          "value": 1.25,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentOut": {
+            "dx": 2,
+            "dy": 0
+          },
+          "tangentIn": {
+            "dx": -1.5,
+            "dy": 0
+          }
+        },
+        {
+          "time": 19.2,
+          "value": 0.5,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentIn": {
+            "dx": -1.5,
+            "dy": 0
+          },
+          "tangentOut": {
+            "dx": 1.5,
+            "dy": 0
+          }
+        },
+        {
+          "time": 24.2,
+          "value": 1.8,
+          "interp": "bezier",
+          "tangentMode": "user",
+          "tangentIn": {
+            "dx": -1.25,
+            "dy": -0.35
+          },
+          "tangentOut": {
+            "dx": 0.5,
+            "dy": 0.15
           }
         }
       ],

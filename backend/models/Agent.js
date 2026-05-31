@@ -27,6 +27,10 @@ const agentSchema = new mongoose.Schema({
         required: true,
         min: 0
     },
+    is_bulk_created: {
+        type: Boolean,
+        default: false
+    },
     creation_date: {
         type: Date,
         default: Date.now

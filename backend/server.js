@@ -17,6 +17,7 @@ const Action = require('./models/Action');
 const UnintentionalAction = require('./models/UnintentionalAction');
 const ObjectEntry = require('./models/ObjectEntry');
 const { SECONDS_PER_TICK, ruleSet } = require('./config/rules');
+const { calculateTotalDiscomfort, calculateReward, updateWeights, selectAction } = require('./ai/brain');
 
 const app = express();
 const server = http.createServer(app); // NEW: Wrap Express in HTTP server
@@ -130,9 +131,22 @@ app.post('/api/login', async (req, res) => {
 
 // --- AUTH CHECK ENDPOINT ---
 // The frontend will call this to see if a user is logged in
-app.get('/api/me', (req, res) => {
+app.get('/api/me', async (req, res) => {
     if (req.session && req.session.userId) {
-        res.json({ authenticated: true, username: req.session.username });
+        try {
+            // Fetch the user to check admin_privileges
+            const user = await User.findById(req.session.userId);
+            res.json({
+                authenticated: true,
+                username: req.session.username,
+                admin_privileges: user ? user.admin_privileges : false,
+                simPaused: simPaused,
+                simTick: simTick,
+                currentInterval: currentInterval
+            });
+        } catch (err) {
+            res.status(500).json({ authenticated: false });
+        }
     } else {
         res.status(401).json({ authenticated: false });
     }
@@ -155,7 +169,7 @@ app.post('/api/creator', async (req, res) => {
             return res.status(401).json({ success: false, message: "Unauthorized: Please log in." });
         }
 
-        // Destructure the incoming payload. 
+        // Destructure the incoming payload.
         // Ensure your HTML form inputs have name="givenName", name="surname", name="gender", etc.
         const { givenName, familyName, surname, gender, age } = req.body;
 
@@ -166,14 +180,14 @@ app.post('/api/creator', async (req, res) => {
             return res.status(400).json({ success: false, message: "Name fields are required." });
         }
 
-        // 2. Build the Agent 
+        // 2. Build the Agent
         // We use the Agent model and explicitly map the frontend variables to your Agent.js schema
         const newAgent = new Agent({
             name: givenName,
             surname: finalSurname,
             gender: gender || 'other', // Provide a fallback to match your enum requirement
             age: age,
-            user: req.session.userId 
+            user: req.session.userId
         });
 
         // 3. Save to MongoDB
@@ -197,7 +211,7 @@ app.get('/api/agents', async (req, res) => {
 
         // Find all agents belonging to the session user, sorted by oldest first
         const agents = await Agent.find({ user: req.session.userId }).sort({ creation_date: 1 });
-        
+      
         res.json({ success: true, agents });
     } catch (error) {
         console.error("Error fetching agents:", error);
@@ -228,12 +242,143 @@ app.get('/api/agents/:id', async (req, res) => {
             snapshot.needs = ramState.needs;
             snapshot.emotions = ramState.emotions;
         }
-        
-        res.json({ success: true, agent, snapshot, logs });
-        
+
+        const urgencies = {};
+        const priorities = {};
+        const finalNeeds = snapshot ? (snapshot.needs.toObject ? snapshot.needs.toObject() : snapshot.needs) : {};
+
+        // Grab the tick from the snapshot to keep history accurate, fallback to global simTick
+        const currentTick = snapshot ? (parseInt(snapshot.tick) || 0) : simTick;
+        const circMult = getCircadianMultiplier(currentTick);
+       
+        for (const [key, val] of Object.entries(finalNeeds)) {
+            urgencies[key] = getUrgencyForNeed(key, val);
+            let currentPriority = (ruleSet.needs[key] && ruleSet.needs[key].priority !== undefined) ? ruleSet.needs[key].priority : 1;
+            if (key === 'sleep') currentPriority = currentPriority * circMult;
+            priorities[key] = currentPriority;
+        }
+       
+        res.json({ success: true, agent, snapshot, logs, urgencies, priorities });
+       
     } catch (error) {
         console.error("Error fetching agent details:", error);
         res.status(500).json({ success: false, message: "Internal server error" });
+    }
+});
+
+// --- BULK CHARACTER CREATION (API REQUIREMENT) ---
+app.post('/api/agents/bulk', async (req, res) => {
+    try {
+        if (!req.session || !req.session.userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const amount = parseInt(req.body.amount) || 100;
+
+        let bulkUser = await User.findOne({ username: 'system_bulk_tester' });
+        if (!bulkUser) {
+            // Generate an impossible password so no one can ever log into this account
+            const hashed = await bcrypt.hash(Date.now().toString() + Math.random(), 10);
+            bulkUser = new User({ username: 'system_bulk_tester', password: hashed });
+            await bulkUser.save();
+        }
+
+        // 1. Fetch from the External API 
+        // We only request the fields we need to keep the payload lightweight
+        const apiUrl = `https://randomuser.me/api/?results=${amount}&inc=name,gender,dob`;
+        const apiResponse = await fetch(apiUrl);
+        const apiData = await apiResponse.json();
+
+        // 2. Map the external data to your Agent schema
+        const newAgentsData = apiData.results.map(user => {
+            return {
+                // user: req.session.userId, // We can use this for having the agents visible immediately
+                user: bulkUser._id,
+                name: user.name.first,
+                surname: user.name.last,
+                gender: user.gender, // randomuser returns 'male'/'female', fitting your enum perfectly
+                age: user.dob.age,
+                is_bulk_created: true
+            };
+        });
+
+        // 3. Bulk insert into MongoDB (Extremely fast compared to looping .save())
+        const insertedAgents = await Agent.insertMany(newAgentsData);
+
+        // 4. Inject them directly into RAM so the sim picks them up instantly
+        const snapshotsToInsert = insertedAgents.map(agent => ({
+            agent: agent._id,
+            tick: simTick,
+            needs: { hunger: 100, thirst: 100, bladder: 100, hygiene: 100, sleep: 100, health: 100 },
+            emotions: { joy: 50, sadness: 0, anger: 0, fear: 0 }
+        }));
+
+        // 5. Bulk insert Snapshots
+        const insertedSnapshots = await AgentSnapshot.insertMany(snapshotsToInsert);
+
+        // 6. Inject them directly into RAM
+        for (const snap of insertedSnapshots) {
+            liveAgents.set(snap.agent.toString(), {
+                needs: snap.needs,
+                emotions: snap.emotions,
+                current_action: null,
+                busy_until: 0,
+                current_action_obj: null,
+                current_action_per_tick: null,
+                lfa_weights: {},
+                last_action_urgencies: {},
+                last_action_id: null,
+                discomfort_at_start: 0,
+                action_duration_ticks: 1
+            });
+        }
+
+        // Emit an event so the frontend knows to refresh the character list
+        io.emit('bulk_agents_added');
+
+        res.json({
+            success: true,
+            message: `Successfully fetched and injected ${amount} agents.`,
+            count: insertedAgents.length
+        });
+
+    } catch (error) {
+        console.error("Bulk creation error:", error);
+        res.status(500).json({ success: false, message: "Internal server error." });
+    }
+});
+
+// --- BULK CHARACTER CLEANUP ---
+app.delete('/api/agents/bulk', async (req, res) => {
+    try {
+        if (!req.session || !req.session.userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        // 1. Find all bulk agents tied to this user
+        const bulkAgents = await Agent.find({ user: req.session.userId, is_bulk_created: true });
+        const bulkAgentIds = bulkAgents.map(a => a._id);
+
+        if (bulkAgentIds.length === 0) {
+             return res.json({ success: true, message: "No bulk agents found to delete." });
+        }
+
+        // 2. Remove them from the hot RAM state so the tick loop ignores them
+        for (const id of bulkAgentIds) {
+            liveAgents.delete(id.toString());
+        }
+
+        // 3. Purge them from the database
+        await AgentSnapshot.deleteMany({ agent: { $in: bulkAgentIds } });
+        await EventLog.deleteMany({ agent: { $in: bulkAgentIds } });
+        const deleteResult = await Agent.deleteMany({ _id: { $in: bulkAgentIds } });
+
+        io.emit('bulk_agents_removed');
+
+        res.json({ success: true, message: `Purged ${deleteResult.deletedCount} test agents and their history.` });
+    } catch (error) {
+        console.error("Bulk deletion error:", error);
+        res.status(500).json({ success: false, message: "Internal server error during cleanup." });
     }
 });
 
@@ -241,93 +386,66 @@ app.get('/api/agents/:id', async (req, res) => {
 // Note: In production, you'd wrap this in an auth check to ensure only YOU can trigger it!
 
 app.post('/api/sim/control', async (req, res) => {
+    // Make sure you have an auth check here in production!
     const { action, value } = req.body;
 
     try {
         if (action === 'pause') {
             simPaused = true;
             await redisClient.set('sim:paused', 'true');
-        } 
-        else if (action === 'resume') {
+            return res.json({ success: true, simTick, simPaused });
+
+        } else if (action === 'resume') {
             simPaused = false;
             await redisClient.set('sim:paused', 'false');
-        } 
-        else if (action === 'set_tick') {
+            return res.json({ success: true, simTick, simPaused });
+
+        } else if (action === 'set_tick') {
             simTick = parseInt(value) || 0;
             await redisClient.set('sim:tick', simTick);
-            // Force an immediate UI update even if paused
-            io.emit('sim_update', { tick: simTick }); 
-        }
-        else {
+            io.emit('sim_update', { tick: simTick });
+            return res.json({ success: true, simTick, simPaused });
+
+        } else if (action === 'set_speed') {
+            const newSpeed = parseInt(value) || 1000;
+            startSimulation(newSpeed);
+            return res.json({ success: true, currentInterval: newSpeed });
+
+        }else if (action === 'fast_forward') {
+            const ticksToRun = parseInt(value) || 10000;
+            const wasPaused = simPaused;
+            simPaused = true;
+
+            fastForwardSim(ticksToRun, res);
+            simPaused = wasPaused;
+            // Return immediately so we don't hit any other res.json below!
+            return;
+
+        } else {
             return res.status(400).json({ success: false, message: "Invalid action" });
         }
 
-        res.json({ success: true, simTick, simPaused });
+        res.json({ success: true, simTick, simPaused, currentInterval });
     } catch (error) {
-        res.status(500).json({ success: false, message: "Sim control failed" });
+        console.error("Sim control route error:", error);
+        if (!res.headersSent) {
+            return res.status(500).json({ success: false, message: "Sim control failed" });
+        }
     }
 });
 
-// --- LUT (Look-Up Table) FOR NEED CURVES ---
-// This will store arrays of exactly 101 values (0 to 100) for instant lookups
-const bakedUrgencyLUT = {}; 
 
-function bakeCurvesToRAM() {
-    console.log("Baking need curves into memory...");
-    try {
-        // 1. Read and parse the JSON file generated by the Curve Editor
-        // (Make sure the path matches where you put needs.curve.json)
-        const rawCurveData = fs.readFileSync('./config/needs.curve.json', 'utf8');
-        const curveFile = JSON.parse(rawCurveData);
-
-        const needNames = ['hunger', 'thirst', 'bladder', 'sleep', 'hygiene'];
-
-        // 2. Loop through each need and build an array of 101 values
-        needNames.forEach(need => {
-            bakedUrgencyLUT[need] = [];
-            
-            // X-axis is 0 to 100 (representing the agent's current need level)
-            for (let i = 0; i <= 100; i++) {
-                // The curve time in the editor goes from 0.0 to 1.0, 
-                // so we normalize our 0-100 value by dividing by 100.
-                const time = i / 100;
-                
-                // Evaluate the curve at this exact frame
-                let urgency = evaluate(curveFile, need, time);
-                
-                // Clean up the floating point math (round to 4 decimals)
-                urgency = Math.round(urgency * 10000) / 10000;
-                
-                // Push to our LUT
-                bakedUrgencyLUT[need].push(urgency);
-            }
-        });
-
-        console.log("Curves baked successfully!");
-        
-        // 3. Print the 'hunger' array to verify it looks correct
-        console.log("--- Baked Hunger LUT ---");
-        console.log(bakedUrgencyLUT['hunger']);
-        console.log("------------------------");
-
-    } catch (err) {
-        console.error("Failed to bake curves. Is the file path correct?", err);
-    }
-}
-
-// Execute the baker immediately
-bakeCurvesToRAM();
 
 // --- NEED MECHANICS CALCULATION ---
 function calculateNeed(needName, currentValue, currentHp) {
-    // 1. Get the rules for this specific need (hunger, hydration, etc.)
-    const rules = ruleSet.needs[needName];
+    // 1. Get the thresholds array for this specific need
+    const rules = ruleSet.needs[needName].thresholds;
 
     // Default to the very last bracket (0) just in case
     let activeBracket = rules[rules.length - 1];
 
     for (const rule of rules) {
-        if (currentValue >= rule.thresholds.threshold) {
+        if (currentValue >= rule.threshold) {
             activeBracket = rule;
             break;
         }
@@ -349,6 +467,86 @@ function calculateNeed(needName, currentValue, currentHp) {
     return { newValue, newHp };
 }
 
+// --- LUT (Look-Up Table) FOR NEED CURVES ---
+// This will store arrays of exactly 101 values (0 to 100) for instant lookups
+const bakedUrgencyLUT = {};
+const bakedCircadianLUT = [];
+
+function bakeCurvesToRAM() {
+    console.log("Baking need curves into memory...");
+    try {
+        // 1. Read and parse the JSON file generated by the Curve Editor
+        // (Make sure the path matches where you put needs.curve.json)
+        const rawCurveData = fs.readFileSync('./config/needs.curve.json', 'utf8');
+        const curveFile = JSON.parse(rawCurveData);
+
+        const needNames = ['hunger', 'thirst', 'bladder', 'sleep', 'hygiene'];
+
+        // 2. Loop through each need and build an array of 101 values
+        needNames.forEach(need => {
+            bakedUrgencyLUT[need] = [];
+            
+            // X-axis is 0 to 100 (representing the agent's current need level)
+            for (let i = 0; i <= 100; i++) {
+                // The curve time in the editor goes from 0.0 to 1.0,
+                // so we normalize our 0-100 value by dividing by 100.
+                const time = i / 100;
+                
+                // Evaluate the curve at this exact frame
+                let urgency = evaluate(curveFile, need, time);
+                
+                // Clean up the floating point math (round to 4 decimals)
+                urgency = Math.round(urgency * 10000) / 10000;
+                
+                // Push to our LUT
+                bakedUrgencyLUT[need].push(urgency);
+            }
+        });
+
+        for (let i = 0; i <= 144; i++) {
+            const time = i / 6;
+            let value = evaluate(curveFile, "circadian", time);
+            value = Math.round(value * 1000) / 1000;
+            bakedCircadianLUT.push(value);
+        }
+
+        console.log("Curves baked successfully!");
+        
+        // 3. Print the 'hunger' array to verify it looks correct
+        console.log("--- Baked Hunger LUT ---");
+        console.dir(bakedUrgencyLUT["hunger"], {'maxArrayLength': null});
+        console.log("------------------------");
+
+    } catch (err) {
+        console.error("Failed to bake curves. Is the file path correct?", err);
+    }
+}
+
+// Execute the baker immediately
+bakeCurvesToRAM();
+
+// --- URGENCY HELPER ---
+function getUrgencyForNeed(needName, value) {
+    // Fallback to 0 for needs that aren't in the LUT (like 'health')
+    if (!bakedUrgencyLUT[needName]) return 0;
+    
+    // Calculate the array index. Since index 0 is 100%, and index 100 is 0%:
+    const index = 100 - Math.round(value);
+    
+    // Clamp the index between 0 and 100 just to be safe
+    const safeIndex = Math.max(0, Math.min(100, index));
+    
+    return bakedUrgencyLUT[needName][safeIndex] || 0;
+}
+
+function getCircadianMultiplier(currentSimTick) {
+    // Use modulo to wrap the total game ticks into the current 24-hour cycle
+    const timeOfDayIndex = currentSimTick % 144;
+    
+    // Return the multiplier, fallback to 1.0 if something breaks
+    return bakedCircadianLUT[timeOfDayIndex] || 1.0;
+}
+
 // --- THE GAME LOOP (SIMULATION TICK) ---
 
 let simTick = 0;
@@ -361,7 +559,7 @@ async function loadSimState() {
     
     if (savedTick) simTick = parseInt(savedTick);
     // If the database says it was running, unpause. Otherwise keep paused.
-    if (savedPause === 'false') simPaused = false; 
+    if (savedPause === 'false') simPaused = false;
     
     console.log(`Sim State Loaded -> Tick: ${simTick} | Paused: ${simPaused}`);
 }
@@ -395,8 +593,7 @@ async function initializeSimulationState() {
         console.log(`Loaded ${actionsCache.length} actions into RAM.`);
 
         // 2. Load all agents
-        const agents = await Agent.find({});
-        for (const agent of agents) {
+        for (const [agentId, state] of liveAgents.entries()) {
             let snap = await AgentSnapshot.findOne({ agent: agent._id }).sort({ timestamp: -1 });
             
             // Your brilliant initialization block for new agents!
@@ -418,7 +615,13 @@ async function initializeSimulationState() {
                 current_action: snap.current_action,
                 busy_until: 0, // Tracks what tick the agent becomes free
                 current_action_obj: null, // Holds the full action data while busy
-                current_action_per_tick: null // Stores the divided fraction
+                current_action_per_tick: null, // Stores the divided fraction
+                // --- AI TRACKING VARIABLES ---
+                lfa_weights: snap.lfa_weights ? Object.fromEntries(snap.lfa_weights) : {},
+                last_action_urgencies: {}, // To store how they felt before the action
+                last_action_id: null, // To know which weights to update
+                discomfort_at_start: 0,
+                action_duration_ticks: 1
             });
         }
         console.log(`Successfully loaded ${liveAgents.size} agents into RAM.`);
@@ -430,146 +633,223 @@ async function initializeSimulationState() {
 // Call this right after loadSimState()
 initializeSimulationState();
 
-// 2. The Core Tick Interval (1 real second)
-setInterval(async () => {
-    if (simPaused) return; // Halt the flow completely
+
+
+// 2. The Core Tick Interval
+let simTimerId = null;
+let currentInterval = 1000; // Milliseconds
+
+// --- CORE TICK LOGIC (Used by Real-Time & Fast-Forward) ---
+function processAgentTick(agentId, state, currentTick) {
+    let needsChanged = false;
+    let actionChanged = false;
+
+    // --- 1. APPLY PASSIVE DECAY ---
+    const needNames = ['hunger', 'thirst', 'bladder', 'hygiene', 'sleep'];
+    for (const need of needNames) {
+        const result = calculateNeed(need, state.needs[need] || 100, state.needs.health);
+        if (result.newValue !== state.needs[need] || result.newHp !== state.needs.health) {
+            state.needs[need] = result.newValue;
+            state.needs.health = result.newHp;
+            needsChanged = true;
+        }
+    }
+
+    // --- Helper to get live urgencies for AI decisions ---
+    const currentUrgencies = {};
+    const currentPriorities = {};
+    const circMult = getCircadianMultiplier(currentTick);
+
+    for (const [key, val] of Object.entries(state.needs)) {
+        currentUrgencies[key] = getUrgencyForNeed(key, val);
+        let p = (ruleSet.needs[key] && ruleSet.needs[key].priority !== undefined) ? ruleSet.needs[key].priority : 1;
+        if (key === 'sleep') p = p * circMult;
+        currentPriorities[key] = p;
+    }
+
+    // --- 2. ACTION LOGIC (Phase A: Learning) ---
+    if (currentTick === state.busy_until && state.last_action_id) {
+        const discomfortAfter = calculateTotalDiscomfort(currentUrgencies, currentPriorities);
+        const reward = calculateReward(state.discomfort_at_start, discomfortAfter, state.action_duration_ticks);
+        
+        state.lfa_weights = updateWeights(
+            state.lfa_weights,
+            state.last_action_id,
+            state.last_action_urgencies,
+            reward
+        );
+    }
+
+    // Apply the active effects of the current action while it runs
+    if (state.current_action_obj && state.current_action_per_tick && currentTick <= state.busy_until) {
+        const e = state.current_action_per_tick;
+        for (const need of needNames) {
+            state.needs[need] = Math.max(0, Math.min(100, state.needs[need] + (e[need] || 0)));
+        }
+        state.needs.health = Math.max(0, Math.min(100, state.needs.health + (e.health || 0)));
+        needsChanged = true;
+    }
+
+    // --- 3. ACTION LOGIC (Phase B: Decision) ---
+    if (currentTick >= state.busy_until && actionsCache.length > 0) {
+        // Capture the "Before" State for the next learning phase
+        state.discomfort_at_start = calculateTotalDiscomfort(currentUrgencies, currentPriorities);
+        state.last_action_urgencies = { ...currentUrgencies };
+        
+        // AI Decision (Epsilon-Greedy)
+        const chosenAction = selectAction(actionsCache, currentUrgencies, state.lfa_weights);
+        
+        state.current_action = chosenAction._id;
+        state.current_action_obj = chosenAction;
+        state.last_action_id = chosenAction._id.toString();
+
+        const ticksNeeded = Math.max(1, Math.ceil(chosenAction.duration / 10));
+        state.busy_until = currentTick + ticksNeeded;
+        state.action_duration_ticks = ticksNeeded;
+        actionChanged = true;
+
+        // Calculate Per-Tick Effect
+        const effect = chosenAction.needs_effect || {};
+        state.current_action_per_tick = {};
+        for (const need of [...needNames, 'health']) {
+            state.current_action_per_tick[need] = (effect[need] || 0) / ticksNeeded;
+        }
+
+        // Only log to DB if we are NOT fast-forwarding (checked by caller)
+    }
+
+    return { needsChanged, actionChanged };
+}
+
+async function tickLoop() {
+    if (simPaused) return;
 
     simTick++;
-    redisClient.set('sim:tick', simTick); // Save tick to Redis & Broadcast to Frontend
+    redisClient.set('sim:tick', simTick);
     io.emit('sim_update', { tick: simTick });
 
-    // B. PROCESS ALL AGENTS FROM RAM
     try {
-        const agents = await Agent.find({});
-
         for (const [agentId, state] of liveAgents.entries()) {
-            let needsChanged = false;
-            let actionChanged = false;
-
-            // 1. --- APPLY PASSIVE DECAY (Mechanics) ---
-            const hungerResult = calculateNeed('hunger', state.needs.hunger || 100, state.needs.health);
-            const thirstResult = calculateNeed('thirst', state.needs.thirst || 100, state.needs.health);
-            const bladderResult = calculateNeed('bladder', state.needs.bladder || 100, state.needs.health);
-            const hygieneResult = calculateNeed('hygiene', state.needs.hygiene || 100, state.needs.health);
-            const sleepResult = calculateNeed('sleep', state.needs.sleep || 100, state.needs.health);
-
-            if (hungerResult.newValue !== state.needs.hunger || hungerResult.newHp !== state.needs.health) {
-                state.needs.hunger = hungerResult.newValue;
-                state.needs.health = hungerResult.newHp;
-                needsChanged = true;
-            }
-            if (thirstResult.newValue !== state.needs.thirst || thirstResult.newHp !== state.needs.health) {
-                state.needs.thirst = thirstResult.newValue;
-                state.needs.health = thirstResult.newHp;
-                needsChanged = true;
-            }
-            if (bladderResult.newValue !== state.needs.bladder || bladderResult.newHp !== state.needs.health) {
-                state.needs.bladder = bladderResult.newValue;
-                state.needs.health = bladderResult.newHp;
-                needsChanged = true;
-            }
-            if (hygieneResult.newValue !== state.needs.hygiene || hygieneResult.newHp !== state.needs.health) {
-                state.needs.hygiene = hygieneResult.newValue;
-                state.needs.health = hygieneResult.newHp;
-                needsChanged = true;
-            }
-            if (sleepResult.newValue !== state.needs.sleep || sleepResult.newHp !== state.needs.health) {
-                state.needs.sleep = sleepResult.newValue;
-                state.needs.health = sleepResult.newHp;
-                needsChanged = true;
-            }
-
-            // 2. --- ACTION LOGIC ---
-                
-            // A. Apply the effects of the FINISHED action
-            if (state.current_action_obj && state.current_action_per_tick && simTick < state.busy_until) {
-                const e = state.current_action_per_tick;
-                state.needs.hunger = Math.max(0, Math.min(100, state.needs.hunger + (e.hunger || 0)));
-                state.needs.thirst = Math.max(0, Math.min(100, state.needs.thirst + (e.thirst || 0)));
-                state.needs.bladder = Math.max(0, Math.min(100, state.needs.bladder + (e.bladder || 0)));
-                state.needs.hygiene = Math.max(0, Math.min(100, state.needs.hygiene + (e.hygiene || 0)));
-                state.needs.sleep = Math.max(0, Math.min(100, state.needs.sleep + (e.sleep || 0)));
-                state.needs.health = Math.max(0, Math.min(100, state.needs.health + (e.health || 0)));
-                needsChanged = true;
-            }
-
             
-            // B. Pick a new random action
-            if (simTick >= state.busy_until) {
+            // Pass the state to our new helper
+            const { needsChanged, actionChanged } = processAgentTick(agentId, state, simTick);
 
-                // Clear the old action data
-                state.current_action_obj = null;
-                state.current_action_per_tick = null;
+            // --- REAL-TIME EVENT LOGGING ---
+            if (actionChanged && state.current_action_obj) {
+                const timeString = formatSimulationTime(simTick);
+                const objectName = state.current_action_obj.object ? state.current_action_obj.object.name : "Unknown Object";
+                let logString = `${state.current_action_obj.name} ${objectName} at ${timeString}`;
                 
-                if (actionsCache.length > 0) {
-                    const randomAction = actionsCache[Math.floor(Math.random() * actionsCache.length)];
-                    state.current_action = randomAction._id;
-                    state.current_action_obj = randomAction;
-
-                    // Duration is in minutes. 1 tick = 10 minutes. Use Math.ceil to ensure at least 1 tick.
-                    const ticksNeeded = Math.max(1, Math.ceil(randomAction.duration / 10));
-                    state.busy_until = simTick + ticksNeeded;
-                    actionChanged = true;
-
-                    // Calculate Per-Tick Effect (Total Effect / Ticks Needed)
-                    const effect = randomAction.needs_effect || {};
-                    state.current_action_per_tick = {
-                        hunger: (effect.hunger || 0) / ticksNeeded,
-                        thirst: (effect.thirst || 0) / ticksNeeded,
-                        bladder: (effect.bladder || 0) / ticksNeeded,
-                        hygiene: (effect.hygiene || 0) / ticksNeeded,
-                        sleep: (effect.sleep || 0) / ticksNeeded,
-                        health: (effect.health || 0) / ticksNeeded
-                    };
-
-                    // Log the event to MongoDB & Frontend
-                    const timeString = formatSimulationTime(simTick);
-                    const objectName = randomAction.object ? randomAction.object.name : "Unknown Object";
-                    let logString = `${randomAction.name} ${objectName} at ${timeString}`;
-                    logString = logString.charAt(0).toUpperCase() + logString.slice(1);
-
-                    const newLog = new EventLog({
-                        agent: agentId,
-                        event_category: 'action',
-                        description: logString,
-                        action: randomAction._id
-                    });
-                    
-                    newLog.save().then(savedLog => {
-                        io.emit('new_event_log', savedLog);
-                    }).catch(err => console.error("EventLog save error:", err));
-                }
+                const newLog = new EventLog({
+                    agent: agentId,
+                    event_category: 'action',
+                    description: logString.charAt(0).toUpperCase() + logString.slice(1),
+                    action: state.current_action_obj._id
+                });
+                newLog.save().then(savedLog => io.emit('new_event_log', savedLog)).catch(console.error);
             }
 
-            // 3. --- REAL-TIME FRONTEND EMIT ---
+            // --- REAL-TIME FRONTEND EMIT ---
             if (needsChanged || actionChanged) {
-                // Instantly send the live RAM state to the UI
+                const urgencies = {};
+                for (const [key, val] of Object.entries(state.needs)) {
+                    urgencies[key] = getUrgencyForNeed(key, val);
+                }
                 io.emit('agent_update', {
                     agentId: agentId,
                     needs: state.needs,
+                    urgencies: urgencies,
                     emotions: state.emotions
                 });
             }
 
-            // 4. --- SAVE TO MONGODB ---
+            // --- SAVE TO MONGODB ---
             if (needsChanged || actionChanged) {
                 const newSnapshot = new AgentSnapshot({
                     agent: agentId,
                     tick: simTick,
                     needs: state.needs,
                     emotions: state.emotions,
-                    current_action: state.current_action
+                    current_action: state.current_action,
+                    lfa_weights: state.lfa_weights // Save the brain!
                 });
-                // We don't await this so the loop keeps ticking without waiting for the DB
-                newSnapshot.save().catch(err => console.error("Snapshot save error:", err));
+                newSnapshot.save().catch(console.error);
             }
         }
     } catch (error) {
         console.error("Tick Processing Error:", error);
     }
+}
 
-}, 1000);
+// --- HEADLESS FAST-FORWARD (TRAINING LOOP) ---
+function fastForwardSim(ticksToRun, res) {
+    const targetTick = simTick + ticksToRun;
+    const chunkSize = 500; // Process 500 ticks before yielding to event loop
+    
+    // Save "Before" Snapshot for all agents
+    for (const [agentId, state] of liveAgents.entries()) {
+        new AgentSnapshot({
+            agent: agentId, tick: simTick, needs: state.needs, emotions: state.emotions, lfa_weights: state.lfa_weights
+        }).save().catch(console.error);
+    }
 
+    function processChunk() {
+        let ticksProcessedThisChunk = 0;
+
+        while (simTick < targetTick && ticksProcessedThisChunk < chunkSize) {
+            simTick++;
+            ticksProcessedThisChunk++;
+
+            // Run the core logic ONLY. No DB saves, no socket emits.
+            for (const [agentId, state] of liveAgents.entries()) {
+                processAgentTick(agentId, state, simTick);
+            }
+        }
+
+        if (simTick < targetTick) {
+            // Yield to the event loop so the server doesn't freeze
+            setImmediate(processChunk);
+        } else {
+            // Done! Save "After" Snapshot and finalize.
+            redisClient.set('sim:tick', simTick);
+            
+            for (const [agentId, state] of liveAgents.entries()) {
+                new AgentSnapshot({
+                    agent: agentId, tick: simTick, needs: state.needs, emotions: state.emotions, lfa_weights: state.lfa_weights
+                }).save().catch(console.error);
+                
+                // Blast final state to the UI
+                io.emit('agent_update', { agentId: agentId, needs: state.needs, emotions: state.emotions });
+            }
+            
+            io.emit('sim_update', { tick: simTick });
+            console.log(`Fast-forward complete. Reached tick ${simTick}`);
+            
+            // Send response back to the admin who triggered it
+            res.json({ success: true, message: `Fast-forwarded ${ticksToRun} ticks.`, newTick: simTick });
+        }
+    }
+
+    // Start the first chunk
+    processChunk();
+}
+
+function startSimulation(interval) {
+    if (simTimerId) {
+        clearInterval(simTimerId); // Destroy the old timer
+    }
+    currentInterval = interval;
+    simTimerId = setInterval(tickLoop, currentInterval); // Start the new one
+}
+
+startSimulation(currentInterval);
+
+// --- Your Admin Endpoint ---
+app.post('/api/admin/speed', (req, res) => {
+    const newSpeed = parseInt(req.body.speed); // e.g., 100 for 10x speed
+    startSimulation(newSpeed);
+    res.json({ success: true, message: `Speed updated to ${newSpeed}ms` });
+});
 
 // --- START SERVER ---
 // Change from app.listen to server.listen!
