@@ -10,36 +10,6 @@
     <link rel="stylesheet" href="CSS/main-style.css?v=4.9">
     <link rel="stylesheet" href="CSS/nebula.css">
     <script src="/socket.io/socket.io.js"></script>
-    <script>
-        fetch('/api/me')
-            .then(response => {
-                if (!response.ok) throw new Error("Not logged in");
-                return response.json();
-            })
-            .then(data => {
-                if (data.authenticated) {
-                    
-                    // Function to safely inject the username
-                    const updateUsername = () => {
-                        const navName = document.getElementById('nav-username');
-                        if (navName) navName.textContent = data.username;
-                    };
-
-                    // If the HTML is still parsing, wait for it. Otherwise, run immediately!
-                    if (document.readyState === 'loading') {
-                        document.addEventListener('DOMContentLoaded', updateUsername);
-                    } else {
-                        updateUsername(); 
-                    }
-
-                } else {
-                    window.location.href = '/index.html'; 
-                }
-            })
-            .catch(() => {
-                window.location.href = '/index.html';
-            });
-    </script>
 </head>
 <body>
     <canvas id="nebula"></canvas>
@@ -168,45 +138,16 @@
                 </div>
         </div>
     </div>
-
-    <div id="admin-panel" style="display: none;">
-    <button id="admin-toggle">
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path id="admin-arrow" d="M15 18l-6-6 6-6" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-    </button>
-    <div class="admin-controls">
-        <button id="btn-play-pause" class="admin-round-item" title="Play / Pause">
-            <svg id="icon-play" viewBox="0 0 24 24" fill="#fff" style="display: none;"><path d="M8 5v14l11-7z"/></svg>
-            <svg id="icon-pause" viewBox="0 0 24 24" fill="#fff" style="display: none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-        </button>
-        <div class="admin-round-item" title="Set Tick">
-            <input type="number" id="input-set-tick" class="admin-num-input" placeholder="0">
-        </div>
-        <div class="admin-round-item" title="Set Speed (ms)">
-            <input type="number" id="input-set-speed" class="admin-num-input" placeholder="ms">
-        </div>
-        <div class="admin-round-item" title="Fast Forward">
-            <input type="number" id="input-fast-forward" class="admin-num-input" placeholder="ticks">
-        </div>
-        <div class="admin-round-item" title="Bulk Create">
-            <input type="number" id="input-bulk-create" class="admin-num-input" placeholder="amount">
-        </div>
-        <button id="btn-bulk-delete" class="admin-round-item" title="Bulk Delete">
-            <svg x="0px" y="0px" viewBox="0 0 64 64" style="enable-background:new 0 0 64 64; fill:#FFFFFF; stroke:#FFFFFF; stroke-width:0.8; stroke-miterlimit:10; padding: 4px;">
-                <path class="st0" d="M56,64l8-8L40,32L64,8l-8-8L32,24L8,0L0,8l24,24L0,56l8,8l24-24L56,64z"/>
-            </svg>
-        </button>
-    </div>
-</div>
 </body>
 <script src="JS/nebula.js"></script>
 <script>
     // --- SIMULATION TIME CALCULATOR ---
     function formatSimulationTime(tick) {
         tick = parseInt(tick) || 0;
-        // 1 tick = 10 minutes
-        const totalMinutes = tick * 10;
+
+        const secondsPerTick = (window.SIM_CONFIG && window.SIM_CONFIG.SECONDS_PER_TICK) ? window.SIM_CONFIG.SECONDS_PER_TICK : 600;
+        
+        const totalMinutes = tick * (secondsPerTick / 60);
         const minutes = totalMinutes % 60;
         const totalHours = Math.floor(totalMinutes / 60);
         const hours = totalHours % 24;
@@ -245,11 +186,6 @@
         if (tickEl) tickEl.textContent = data.tick;
         if (timeEl) timeEl.textContent = simCalendar.timeString;
         if (dateEl) dateEl.textContent = simCalendar.dateString;
-
-        // Update Admin Tick input (only if they aren't actively typing in it)
-        if (document.getElementById('input-set-tick') && !isTickInputFocused) {
-            document.getElementById('input-set-tick').value = data.tick;
-        }
     });
 
     // Listen for live need/emotion changes
@@ -344,179 +280,68 @@
         document.getElementById('main-display').style.display = 'none'; // Hide the display in case the active agent was deleted
     });
 
-    // Global state trackers for the UI
-    let isPaused = false;
-    let isTickInputFocused = false;
+    // socket.on('admin_server_error', (errorData) => {
+    //     // Instead of an alert(), log it nicely or use a Toast
+    //     console.warn(`SERVER ERROR: ${errorData.context}`, errorData.details);
+        
+    //     // Example of calling a custom UI Toast function (you can style this in CSS)
+    //     showAdminToast(errorData.context, errorData.details);
+    // });
 
-    fetch('/api/me')
-        .then(response => {
-            if (!response.ok) throw new Error("Not logged in");
-            return response.json();
-        })
-        .then(data => {
-            if (data.authenticated) {
+    // --- UNIFIED APPLICATION INITIALIZATION ---
+    document.addEventListener("DOMContentLoaded", () => {
+        fetch('/api/me')
+            .then(response => {
+                if (!response.ok) throw new Error("Not logged in");
+                return response.json();
+            })
+            .then(data => {
+                // 1. Core Auth Check
+                if (!data.authenticated) {
+                    // Using .replace() instead of .href prevents the user from getting stuck in a back-button loop!
+                    window.location.replace('/index.html'); 
+                    return;
+                }
+
+                // 2. Setup Standard User UI
                 const userElement = document.getElementById('nav-username');
                 if (userElement) userElement.textContent = data.username;
-                
-                if (data.admin_privileges) {
-                    document.getElementById('admin-panel').style.display = 'flex';
-                    
-                    isPaused = data.simPaused;
-                    updatePlayPauseIcon();
-                    document.getElementById('input-set-tick').value = data.simTick;
-                    document.getElementById('input-set-speed').value = data.currentInterval;
 
-                    initAdminPanel();
+                // 3. Fetch Dynamic Configs
+                fetch('/api/config')
+                    .then(res => res.json())
+                    .then(configData => {
+                        if (configData.success) {
+                            window.SIM_CONFIG = {
+                                SECONDS_PER_TICK: configData.SECONDS_PER_TICK
+                            };
+                        }
+                    });
+
+                // 4. Secure Admin Injection
+                if (data.admin_privileges) {
+                    // The socket is already defined globally above, we just join the room
+                    socket.emit('join_admin_room');
+
+                    const script = document.createElement('script');
+                    script.src = '/api/sim/control/script';
+                    script.onload = () => {
+                        // Once the script is securely downloaded, build the tools
+                        initializeAdminEnvironment(data.simPaused, data.simTick, data.currentInterval);
+                    };
+                    document.body.appendChild(script);
                 }
                 
+                // 5. Finally, Load the Agents!
                 loadUserAgents();
-            } else {
-                window.location.href = '/index.html'; 
-            }
-        })
-        .catch(() => {
-            window.location.href = '/index.html';
-        });
+            })
+            .catch(err => {
+                console.warn("Authentication failed or server unreachable:", err);
+                window.location.replace('/index.html');
+            });
+    });
 
     
-
-    // Admin Panel Functions
-    function initAdminPanel() {
-        const panel = document.getElementById('admin-panel');
-        const toggleBtn = document.getElementById('admin-toggle');
-        const playPauseBtn = document.getElementById('btn-play-pause');
-        const tickInput = document.getElementById('input-set-tick');
-        const speedInput = document.getElementById('input-set-speed');
-        const fastForwardInput = document.getElementById('input-fast-forward');
-        const bulkCreateInput = document.getElementById('input-bulk-create');
-        const bulkDeleteBtn = document.getElementById('btn-bulk-delete');
-
-        // 1. Toggle Slide
-        toggleBtn.addEventListener('click', () => panel.classList.toggle('open'));
-
-        // Track if user is typing so we don't overwrite their input with Socket data
-        tickInput.addEventListener('focus', () => isTickInputFocused = true);
-        tickInput.addEventListener('blur', () => isTickInputFocused = false);
-
-        // 2. Play / Pause
-        playPauseBtn.addEventListener('click', async () => {
-            const action = isPaused ? 'resume' : 'pause';
-            await sendAdminCommand(action);
-            isPaused = !isPaused;
-            updatePlayPauseIcon();
-        });
-
-        // 3. Set Tick (Enter key)
-        tickInput.addEventListener('keydown', async (e) => {
-            if (e.key === 'Enter') {
-                const val = parseInt(tickInput.value);
-                if (!isNaN(val)) {
-                    await sendAdminCommand('set_tick', val);
-                    tickInput.blur(); // Remove focus after submit
-                }
-            }
-        });
-
-        // 4. Set Speed (Enter key)
-        speedInput.addEventListener('keydown', async (e) => {
-            if (e.key === 'Enter') {
-                const val = parseInt(speedInput.value);
-                if (!isNaN(val)) {
-                    await sendAdminCommand('set_speed', val);
-                    speedInput.blur();
-                }
-            }
-        });
-
-        // 5. Fast Forward (Enter key)
-        fastForwardInput.addEventListener('keydown', async (e) => {
-            if (e.key === 'Enter') {
-                const val = parseInt(fastForwardInput.value);
-                if (!isNaN(val)) {
-                    await sendAdminCommand('fast_forward', val);
-                    fastForwardInput.blur();
-                }
-            }
-        });
-
-        // 6. Bulk Create (Enter key)
-        bulkCreateInput.addEventListener('keydown', async (e) => {
-            if (e.key === 'Enter') {
-                const val = parseInt(bulkCreateInput.value);
-                if (!isNaN(val)) {
-                    await generateBulkAgents(val);
-                    bulkCreateInput.blur();
-                }
-            }
-        });
-
-        // 7. Bulk Delete
-        bulkDeleteBtn.addEventListener('click', async () => {
-            await cleanBulkAgents();
-        });
-    }
-
-    async function sendAdminCommand(action, value = null) {
-        try {
-            const payload = { action };
-            if (value !== null) payload.value = value;
-
-            await fetch('/api/sim/control', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-        } catch (err) {
-            console.error("Admin command failed", err);
-        }
-    }
-
-    function updatePlayPauseIcon() {
-        document.getElementById('icon-play').style.display = isPaused ? 'block' : 'none';
-        document.getElementById('icon-pause').style.display = isPaused ? 'none' : 'block';
-    }
-
-    async function generateBulkAgents(amount) {
-        const inputEl = document.getElementById('input-bulk-create');
-        inputEl.disabled = true;
-
-        try {
-            const res = await fetch('/api/agents/bulk', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ amount })
-            });
-            const data = await res.json();
-            
-            if (data.success) {
-                console.log(data.message); // Success! Socket will handle the UI refresh.
-                inputEl.value = ''; // Clear the input
-            } else {
-                alert("Error: " + data.message);
-            }
-        } catch(e) {
-            console.error("Error generating agents:", e);
-        }
-        
-        inputEl.disabled = false; // Re-enable
-    }
-
-    async function cleanBulkAgents() {
-        if (!confirm("Are you sure? This will permanently delete all bulk-generated agents and their logs.")) return;
-        
-        try {
-            const res = await fetch('/api/agents/bulk', { method: 'DELETE' });
-            const data = await res.json();
-            
-            if (data.success) {
-                console.log(data.message);
-            }
-        } catch(e) {
-            console.error("Error cleaning up:", e);
-        }
-    }
-
-
 
     // --- NEW FUNCTION TO LOAD AGENTS ---
     async function loadUserAgents() {

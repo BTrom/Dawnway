@@ -8,6 +8,8 @@ const RedisStore = require('connect-redis').default;
 const { createClient } = require('redis');
 const fs = require('fs');
 const { evaluate } = require('curve-eval');
+const cors = require('cors');
+const path = require('path');
 
 const User = require('./models/User');
 const Agent = require('./models/Agent');
@@ -27,18 +29,22 @@ const PORT = process.env.PORT || 3000;
 // Middleware to parse incoming JSON and Form Data
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cors({
+    origin: 'https://dawnway-lab.es/', // Change this to your production domain later!
+    credentials: true // This is crucial: it allows the session cookies to be passed back and forth
+}));
 
 // --- DATABASE CONNECTIONS ---
 // 1. Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI || 'mongodb://mongodb:27017/dawnway_db')
     .then(() => console.log('Connected to MongoDB'))
-    .catch(err => console.error('MongoDB connection error:', err));
+    .catch(err => logAndEmitError('MongoDB connection error:', err));
 
 // 2. Connect to Redis (for Sessions)
 const redisClient = createClient({
     url: `redis://${process.env.REDIS_HOST || 'redis'}:${process.env.REDIS_PORT || 6379}`
 });
-redisClient.connect().catch(console.error);
+redisClient.connect().catch(err => logAndEmitError('Redis connection error:', err));
 
 // 3. Configure Sessions
 app.use(session({
@@ -53,15 +59,37 @@ app.use(session({
     }
 }));
 
+const requireAuth = (req, res, next) => {
+    if (req.session && req.session.userId) {
+        return next(); // The user has a valid session cookie, let them through
+    }
+    return res.status(401).json({ success: false, message: "Unauthorized: Please log in." });
+};
+
+const requireAdmin = async (req, res, next) => {
+    if (!req.session || !req.session.userId) {
+        return res.status(401).json({ success: false, message: "Unauthorized." });
+    }
+    try {
+        const user = await User.findById(req.session.userId);
+        if (user && user.admin_privileges) {
+            return next(); // They are logged in AND an admin, let them through
+        }
+        return res.status(403).json({ success: false, message: "Forbidden: Admins only." });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: "Internal server error." });
+    }
+};
+
 // --- ROUTES ---
 
 // SIGN UP ENDPOINT (Replaces PHP/signup.php)
 app.post('/api/signup', async (req, res) => {
     try {
-        const { username, password, password2 } = req.body;
+        const { username, email, password, password2 } = req.body;
 
         // Validation
-        if (!username || !password || !password2) {
+        if (!username || !email || !password || !password2) {
             return res.status(400).json({ success: false, message: "All fields are required." });
         }
         if (password !== password2) {
@@ -80,6 +108,7 @@ app.post('/api/signup', async (req, res) => {
         // Create and save the new user to MongoDB
         const newUser = new User({
             username: username,
+            email: email,
             password: hashedPassword
         });
         await newUser.save();
@@ -92,7 +121,7 @@ app.post('/api/signup', async (req, res) => {
         res.json({ success: true });
 
     } catch (error) {
-        console.error("Signup error:", error);
+        logAndEmitError("Signup error:", error);
         res.status(500).json({ success: false, message: "Internal server error." });
     }
 });
@@ -124,7 +153,7 @@ app.post('/api/login', async (req, res) => {
 
         res.json({ success: true });
     } catch (error) {
-        console.error("Login error:", error);
+        logAndEmitError("Login error:", error);
         res.status(500).json({ success: false, message: "Internal server error." });
     }
 });
@@ -141,8 +170,8 @@ app.get('/api/me', async (req, res) => {
                 username: req.session.username,
                 admin_privileges: user ? user.admin_privileges : false,
                 simPaused: simPaused,
-                simTick: simTick,
-                currentInterval: currentInterval
+  simTick: simTick,
+  currentInterval: currentInterval
             });
         } catch (err) {
             res.status(500).json({ authenticated: false });
@@ -162,26 +191,26 @@ app.post('/api/logout', (req, res) => {
 });
 
 // --- CHARACTER CREATION ENDPOINT ---
-app.post('/api/creator', async (req, res) => {
+app.post('/api/creator', requireAuth, async (req, res) => {
     try {
-        // 1. Security Check: Are they logged in?
-        if (!req.session || !req.session.userId) {
-            return res.status(401).json({ success: false, message: "Unauthorized: Please log in." });
-        }
-
-        // Destructure the incoming payload.
-        // Ensure your HTML form inputs have name="givenName", name="surname", name="gender", etc.
         const { givenName, familyName, surname, gender, age } = req.body;
-
-        // Fallback to check either surname or familyName depending on what your HTML uses
         const finalSurname = surname || familyName;
 
         if (!givenName || !finalSurname) {
             return res.status(400).json({ success: false, message: "Name fields are required." });
         }
+        
+        // Fetch user context and count existing agents to properly evaluate the limit
+        const user = await User.findById(req.session.userId);
+        const currentAgentCount = await Agent.countDocuments({ user: req.session.userId });
 
-        // 2. Build the Agent
-        // We use the Agent model and explicitly map the frontend variables to your Agent.js schema
+        if (currentAgentCount >= user.character_limit) {
+            return res.status(403).json({ 
+                success: false, 
+                message: `Character limit reached. You can only have ${user.character_limit} active agents.` 
+            });
+        }
+
         const newAgent = new Agent({
             name: givenName,
             surname: finalSurname,
@@ -190,13 +219,11 @@ app.post('/api/creator', async (req, res) => {
             user: req.session.userId
         });
 
-        // 3. Save to MongoDB
         await newAgent.save();
-
         res.json({ success: true, character: newAgent });
 
     } catch (error) {
-        console.error("Agent creation error:", error);
+        logAndEmitError("Agent creation error:", error);
         res.status(500).json({ success: false, message: "Internal server error." });
     }
 });
@@ -204,17 +231,23 @@ app.post('/api/creator', async (req, res) => {
 // --- FETCH USER'S AGENTS ENDPOINT ---
 app.get('/api/agents', async (req, res) => {
     try {
-        // Security check
-        if (!req.session || !req.session.userId) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
-        }
+        // We're leaving this one open
+        // if (!req.session || !req.session.userId) {
+        //     return res.status(401).json({ success: false, message: "Unauthorized" });
+        // }
+
+        let agents;
 
         // Find all agents belonging to the session user, sorted by oldest first
-        const agents = await Agent.find({ user: req.session.userId }).sort({ creation_date: 1 });
+        if (req.session && req.session.userId) {
+            agents = await Agent.find({ user: req.session.userId }).sort({ creation_date: 1 });
+        } else {
+            agents = await Agent.find({});
+        }
       
         res.json({ success: true, agents });
     } catch (error) {
-        console.error("Error fetching agents:", error);
+        logAndEmitError("Error fetching agents:", error);
         res.status(500).json({ success: false, message: "Internal server error" });
     }
 });
@@ -222,12 +255,13 @@ app.get('/api/agents', async (req, res) => {
 // --- FETCH SINGLE AGENT, LATEST SNAPSHOT & LOGS ---
 app.get('/api/agents/:id', async (req, res) => {
     try {
-        if (!req.session || !req.session.userId) {
-            return res.status(401).json({ success: false, message: "Unauthorized" });
-        }
+        // if (!req.session || !req.session.userId) {
+        //     return res.status(401).json({ success: false, message: "Unauthorized" });
+        // }
 
         const agentId = req.params.id;
-        const agent = await Agent.findOne({ _id: agentId, user: req.session.userId });
+        // const agent = await Agent.findOne({ _id: agentId, user: req.session.userId });
+        const agent = await Agent.findById(agentId);
 
         if (!agent) {
             return res.status(404).json({ success: false, message: "Agent not found" });
@@ -261,13 +295,13 @@ app.get('/api/agents/:id', async (req, res) => {
         res.json({ success: true, agent, snapshot, logs, urgencies, priorities });
        
     } catch (error) {
-        console.error("Error fetching agent details:", error);
+        logAndEmitError("Error fetching agent details:", error);
         res.status(500).json({ success: false, message: "Internal server error" });
     }
 });
 
 // --- BULK CHARACTER CREATION (API REQUIREMENT) ---
-app.post('/api/agents/bulk', async (req, res) => {
+app.post('/api/agents/bulk', requireAdmin, async (req, res) => {
     try {
         if (!req.session || !req.session.userId) {
             return res.status(401).json({ success: false, message: "Unauthorized" });
@@ -343,13 +377,13 @@ app.post('/api/agents/bulk', async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Bulk creation error:", error);
+        logAndEmitError("Bulk creation error:", error);
         res.status(500).json({ success: false, message: "Internal server error." });
     }
 });
 
 // --- BULK CHARACTER CLEANUP ---
-app.delete('/api/agents/bulk', async (req, res) => {
+app.delete('/api/agents/bulk', requireAdmin, async (req, res) => {
     try {
         if (!req.session || !req.session.userId) {
             return res.status(401).json({ success: false, message: "Unauthorized" });
@@ -377,7 +411,7 @@ app.delete('/api/agents/bulk', async (req, res) => {
 
         res.json({ success: true, message: `Purged ${deleteResult.deletedCount} test agents and their history.` });
     } catch (error) {
-        console.error("Bulk deletion error:", error);
+        logAndEmitError("Bulk deletion error:", error);
         res.status(500).json({ success: false, message: "Internal server error during cleanup." });
     }
 });
@@ -385,7 +419,7 @@ app.delete('/api/agents/bulk', async (req, res) => {
 // --- SIMULATION CONTROL ENDPOINTS (ADMIN) ---
 // Note: In production, you'd wrap this in an auth check to ensure only YOU can trigger it!
 
-app.post('/api/sim/control', async (req, res) => {
+app.post('/api/sim/control', requireAdmin, async (req, res) => {
     // Make sure you have an auth check here in production!
     const { action, value } = req.body;
 
@@ -427,12 +461,45 @@ app.post('/api/sim/control', async (req, res) => {
 
         res.json({ success: true, simTick, simPaused, currentInterval });
     } catch (error) {
-        console.error("Sim control route error:", error);
+        logAndEmitError("Sim control route error:", error);
         if (!res.headersSent) {
             return res.status(500).json({ success: false, message: "Sim control failed" });
         }
     }
 });
+
+app.get('/api/sim/control/script', requireAdmin, (req, res) => {
+    // Assuming admin-tools.js is in the same directory as server.js
+    res.sendFile(path.join(__dirname, 'admin-tools.js')); 
+});
+
+app.get('/api/config', requireAuth, (req, res) => {
+    res.json({
+        success: true,
+        SECONDS_PER_TICK: SECONDS_PER_TICK
+    });
+});
+
+io.on('connection', (socket) => {
+    // When a user logs in and the frontend sees they are an admin,
+    // it will emit this event to subscribe to real-time server errors.
+    socket.on('join_admin_room', () => {
+        socket.join('admins');
+        logAndEmitError(`Admin joined debugging room: ${socket.id}`);
+    });
+});
+
+// --- NEW: CENTRALIZED ERROR LOGGER ---
+function logAndEmitError(contextMessage, errorObj = null) {
+    // 1. Still log to the terminal so you have a permanent record
+    console.error(`[ERROR] ${contextMessage}`, errorObj || '');
+
+    // 2. Emit only to sockets in the 'admins' room
+    io.to('admins').emit('admin_server_error', {
+        context: contextMessage,
+        details: errorObj ? (errorObj.message || errorObj.toString()) : 'No additional details'
+    });
+}
 
 
 
@@ -518,7 +585,7 @@ function bakeCurvesToRAM() {
         console.log("------------------------");
 
     } catch (err) {
-        console.error("Failed to bake curves. Is the file path correct?", err);
+        logAndEmitError("Failed to bake curves. Is the file path correct?", err);
     }
 }
 
@@ -626,7 +693,7 @@ async function initializeSimulationState() {
         }
         console.log(`Successfully loaded ${liveAgents.size} agents into RAM.`);
     } catch (err) {
-        console.error("Failed to initialize game state:", err);
+        logAndEmitError("Failed to initialize game state:", err);
     }
 }
 
@@ -746,7 +813,7 @@ async function tickLoop() {
                     description: logString.charAt(0).toUpperCase() + logString.slice(1),
                     action: state.current_action_obj._id
                 });
-                newLog.save().then(savedLog => io.emit('new_event_log', savedLog)).catch(console.error);
+                newLog.save().then(savedLog => io.emit('new_event_log', savedLog)).catch(err => logAndEmitError('Error saving event log:', err));
             }
 
             // --- REAL-TIME FRONTEND EMIT ---
@@ -773,11 +840,11 @@ async function tickLoop() {
                     current_action: state.current_action,
                     lfa_weights: state.lfa_weights // Save the brain!
                 });
-                newSnapshot.save().catch(console.error);
+                newSnapshot.save().catch(err => logAndEmitError('Error saving agent snapshot:', err));
             }
         }
     } catch (error) {
-        console.error("Tick Processing Error:", error);
+        logAndEmitError("Tick Processing Error:", error);
     }
 }
 
@@ -790,7 +857,7 @@ function fastForwardSim(ticksToRun, res) {
     for (const [agentId, state] of liveAgents.entries()) {
         new AgentSnapshot({
             agent: agentId, tick: simTick, needs: state.needs, emotions: state.emotions, lfa_weights: state.lfa_weights
-        }).save().catch(console.error);
+        }).save().catch(err => logAndEmitError('Error saving agent snapshot:', err));
     }
 
     function processChunk() {
@@ -816,7 +883,7 @@ function fastForwardSim(ticksToRun, res) {
             for (const [agentId, state] of liveAgents.entries()) {
                 new AgentSnapshot({
                     agent: agentId, tick: simTick, needs: state.needs, emotions: state.emotions, lfa_weights: state.lfa_weights
-                }).save().catch(console.error);
+                }).save().catch(err => logAndEmitError('Error saving agent snapshot:', err));
                 
                 // Blast final state to the UI
                 io.emit('agent_update', { agentId: agentId, needs: state.needs, emotions: state.emotions });
@@ -843,13 +910,6 @@ function startSimulation(interval) {
 }
 
 startSimulation(currentInterval);
-
-// --- Your Admin Endpoint ---
-app.post('/api/admin/speed', (req, res) => {
-    const newSpeed = parseInt(req.body.speed); // e.g., 100 for 10x speed
-    startSimulation(newSpeed);
-    res.json({ success: true, message: `Speed updated to ${newSpeed}ms` });
-});
 
 // --- START SERVER ---
 // Change from app.listen to server.listen!
