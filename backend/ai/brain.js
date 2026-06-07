@@ -1,4 +1,4 @@
-const ALPHA = 0.1;   // How fast they learn (Learning Rate)
+const ALPHA = 0.01;   // How fast they learn (Learning Rate)
 
 /**
  * Calculates the total current discomfort of the agent.
@@ -35,7 +35,7 @@ function calculateReward(discomfortBefore, discomfortAfter, durationTicks) {
  * Updates the agent's memory (weights) using Gradient Descent.
  * New Weight = Old Weight + (Learning_Rate * Reward * Urgency_At_The_Time)
  */
-function updateWeights(weightsMap, lastActionId, lastUrgencies, needRewards) {
+function updateWeights(weightsMap, memoryData, lastActionId, lastUrgencies, needRewards) {
     for (const need in lastUrgencies) {
         const urgencyAtStart = lastUrgencies[need];
 
@@ -50,13 +50,17 @@ function updateWeights(weightsMap, lastActionId, lastUrgencies, needRewards) {
 
             // Gradient Descent
             let newWeight = currentWeight + (ALPHA * error * urgencyAtStart);
-
             // Weight Clipping (Regularization)
-            // Prevents weights from exploding to infinity when urgencyAtStart is near 0.
-            // Bounding between -5.0 and 5.0 provides a stable matrix.
             newWeight = Math.max(-5.0, Math.min(5.0, newWeight));
-
             weightsMap[weightKey] = newWeight;
+
+            // EBBINGHAUS: Reinforce memory strength
+            // The more an action is taken for a need, the slower it will be forgotten later.
+            if (!memoryData[weightKey]) {
+                memoryData[weightKey] = { strength: 1 };
+            } else {
+                memoryData[weightKey].strength += 0.5; 
+            }
         }
     }
     return weightsMap;
@@ -72,7 +76,7 @@ function selectAction(actionsCache, urgencies, weightsMap, currentEpsilon) {
     }
 
     // EXPLOIT: Pick the action with the highest expected reward (Q-Value)
-    let bestAction = null;
+    let bestActions = [];
     let highestQValue = -Infinity;
 
     for (const action of actionsCache) {
@@ -85,19 +89,88 @@ function selectAction(actionsCache, urgencies, weightsMap, currentEpsilon) {
             qValue += weight * urgencies[need];
         }
 
+        // If we find a strictly better action, clear the array and start over
         if (qValue > highestQValue) {
             highestQValue = qValue;
-            bestAction = action;
+            bestActions = [action];
+        } else if (qValue === highestQValue) {
+            bestActions.push(action); // Tie found, add to the array
         }
     }
 
-    // Fallback just in case
-    return bestAction || actionsCache[Math.floor(Math.random() * actionsCache.length)];
+    // Break the tie by picking randomly from the bestActions array
+    if (bestActions.length > 0) {
+        return bestActions[Math.floor(Math.random() * bestActions.length)];
+    }
+
+    // Ultimate fallback
+    return actionsCache[Math.floor(Math.random() * actionsCache.length)];
+}
+
+/**
+ * Applies the Ebbinghaus Forgetting Curve to decay weights towards 0.
+ * Formula: Retention = e^(-t * rate / S)
+ */
+function applyEbbinghausForgetting(weightsMap, memoryData, ticksPassed) {
+    // Tune this rate. Higher means they forget Q-values faster.
+    const FORGETTING_RATE = 0.005; 
+
+    for (const key in weightsMap) {
+        if (memoryData[key]) {
+            const strength = Math.max(1, memoryData[key].strength);
+            
+            // Calculate how much memory is retained over the passed ticks
+            const retention = Math.exp(-(ticksPassed * FORGETTING_RATE) / strength);
+            
+            // Decay the weight towards zero
+            weightsMap[key] = weightsMap[key] * retention;
+        }
+    }
+    return weightsMap;
+}
+
+/**
+ * Passively shares knowledge from a teacher to a student.
+ * Gated by a minimum teacher confidence, and restricted to the current shared action.
+ */
+function absorbKnowledge(studentWeights, studentMemory, teacherWeights, teacherMemory, currentActionId) {
+    const TAU = 0.1; // Social Learning Rate: How much they learn per tick of exposure
+    const MIN_TEACHER_STRENGTH = 5.0; // The "Elder" threshold
+
+    for (const key in teacherWeights) {
+        // Restrict sharing to the action they are currently performing together
+        if (!key.startsWith(`${currentActionId}_`)) {
+            continue;
+        }
+
+        const teacherStrength = teacherMemory[key] ? teacherMemory[key].strength : 0;
+        const studentStrength = studentMemory[key] ? studentMemory[key].strength : 0;
+
+        // Only learn if the teacher is more experienced with this specific knowledge
+        if (teacherStrength >= MIN_TEACHER_STRENGTH && teacherStrength > studentStrength + 1.0) { // +1.0 threshold prevents swapping negligible differences
+            const tWeight = teacherWeights[key];
+            const sWeight = studentWeights[key] || 0;
+
+            // Soft Update (Polyak Averaging)
+            studentWeights[key] = sWeight + (TAU * (tWeight - sWeight));
+
+            // Boost the student's memory strength slightly so they retain the taught knowledge
+            if (!studentMemory[key]) {
+                studentMemory[key] = { strength: 1.5 }; // Base strength for taught knowledge
+            } else {
+                studentMemory[key].strength += 0.1; 
+            }
+        }
+    }
+    
+    return { updatedWeights: studentWeights, updatedMemory: studentMemory };
 }
 
 module.exports = {
     calculateTotalDiscomfort,
     calculateReward,
     updateWeights,
-    selectAction
+    selectAction,
+    applyEbbinghausForgetting,
+    absorbKnowledge
 };

@@ -19,7 +19,7 @@ const Action = require('./models/Action');
 const UnintentionalAction = require('./models/UnintentionalAction');
 const ObjectEntry = require('./models/ObjectEntry');
 const { SECONDS_PER_TICK, ruleSet } = require('./config/rules');
-const { calculateTotalDiscomfort, calculateReward, updateWeights, selectAction } = require('./ai/brain');
+const { calculateTotalDiscomfort, calculateReward, updateWeights, selectAction, applyEbbinghausForgetting, absorbKnowledge } = require('./ai/brain');
 
 const app = express();
 const server = http.createServer(app); // NEW: Wrap Express in HTTP server
@@ -554,6 +554,8 @@ app.post('/api/sim/control', requireAdmin, async (req, res) => {
                 state.discomfort_at_start = 0;
                 state.action_duration_ticks = 1;
                 state.lfa_weights = {};
+                state.action_history_window = []; 
+                state.last_accuracy = 0;
 
                 const urgencies = {};
                 for (const [key, val] of Object.entries(state.needs)) {
@@ -732,6 +734,41 @@ function getCircadianMultiplier(currentSimTick) {
     return bakedCircadianLUT[timeOfDayIndex] || 1.0;
 }
 
+// --- KNOWLEDGE TRANSFER (SOCIAL PHASE) ---
+function processKnowledgeTransfer(currentLiveAgents) {
+    // 1. Group agents by their current action
+    const actionGroups = {};
+    for (const [agentId, state] of currentLiveAgents.entries()) {
+        if (state.current_action) {
+            if (!actionGroups[state.current_action]) actionGroups[state.current_action] = [];
+            actionGroups[state.current_action].push({ id: agentId, state: state });
+        }
+    }
+
+    // 2. Trigger Passive Knowledge Transfer
+    for (const actionId in actionGroups) {
+        const agentsAtAction = actionGroups[actionId];
+        
+        if (agentsAtAction.length > 1) {
+            const primary = agentsAtAction[0].state;
+            
+            for (let i = 1; i < agentsAtAction.length; i++) {
+                const peer = agentsAtAction[i].state;
+                
+                // Primary learns from Peer
+                const learnFromPeer = absorbKnowledge(primary.lfa_weights, primary.weight_memory_data, peer.lfa_weights, peer.weight_memory_data, actionId);
+                primary.lfa_weights = learnFromPeer.updatedWeights;
+                primary.weight_memory_data = learnFromPeer.updatedMemory;
+
+                // Peer learns from Primary
+                const learnFromPrimary = absorbKnowledge(peer.lfa_weights, peer.weight_memory_data, primary.lfa_weights, primary.weight_memory_data, actionId);
+                peer.lfa_weights = learnFromPrimary.updatedWeights;
+                peer.weight_memory_data = learnFromPrimary.updatedMemory;
+            }
+        }
+    }
+}
+
 // --- THE GAME LOOP (SIMULATION TICK) ---
 let simPaused = true; // Let's start paused by default so it doesn't run away from you!
 
@@ -803,6 +840,8 @@ async function initializeSimulationState() {
                 current_action_per_tick: null, 
                 // --- AI TRACKING VARIABLES ---
                 lfa_weights: snap.lfa_weights ? Object.fromEntries(snap.lfa_weights) : {},
+                weight_memory_data: snap.weight_memory_data ? Object.fromEntries(snap.weight_memory_data) : {},
+                last_decision_tick: simTick,
                 last_action_urgencies: {}, 
                 last_action_id: null, 
                 discomfort_at_start: 0,
@@ -900,7 +939,7 @@ function processAgentTick(agentId, state, currentTick) {
             // const delta = (urgencyBefore - urgencyAfter) - 0.05; // <-- This is the old line before asymmetric bounding
             
             needRewards[need] = delta;
-            totalRewardForGraph += delta; 
+            totalRewardForGraph += delta;
         }
 
         rewardGained = totalRewardForGraph; // Feed the total sum to your exam graph
@@ -908,6 +947,7 @@ function processAgentTick(agentId, state, currentTick) {
         // Update the brain using the specific report card
         state.lfa_weights = updateWeights(
             state.lfa_weights,
+            state.weight_memory_data,
             state.last_action_id,
             state.last_action_urgencies,
             needRewards
@@ -916,6 +956,22 @@ function processAgentTick(agentId, state, currentTick) {
 
     // --- 5. ACTION LOGIC (Phase B: Decision) ---
     if (currentTick >= state.busy_until && actionsCache.length > 0) {
+        // --- APPLY EBBINGHAUS FORGETTING ---
+        // For now, treat the time passed as exactly 1 decision step so long actions 
+        // don't completely wipe the agent's memory.
+       const memoryDecaySteps = 1;
+        
+        if (state.weight_memory_data) {
+            state.lfa_weights = applyEbbinghausForgetting(
+                state.lfa_weights,
+                state.weight_memory_data,
+                memoryDecaySteps // Pass the fixed step instead of ticksPassed
+            );
+        }
+
+        // Reset the timer for the next cycle
+        state.last_decision_tick = currentTick;
+        
         state.discomfort_at_start = calculateTotalDiscomfort(currentUrgencies, currentPriorities);
         state.last_action_urgencies = { ...currentUrgencies };
         
@@ -930,11 +986,11 @@ function processAgentTick(agentId, state, currentTick) {
         }
 
         // --- NEW: Calculate Epsilon Decay ---
-        // Starts at 0.25 (25%), decays gradually, and floors at 0.03 (3%) 
+        // Starts at 0.25 (25%), decays gradually, and floors at 0.05 (5%) 
         // after the agent has taken 2,200 actions.
-        const minEpsilon = 0.03; 
+        const minEpsilon = 0.05;
         const startingEpsilon = 0.25;
-        const decayRate = 0.0001; 
+        const decayRate = 0.00005;
         
         const agentEpsilon = Math.max(
             minEpsilon, 
@@ -975,9 +1031,16 @@ async function tickLoop() {
 
     try {
         for (const [agentId, state] of liveAgents.entries()) {
-            
-            // Pass the state to our new helper
             const { needsChanged, actionChanged } = processAgentTick(agentId, state, simTick);
+
+            // 1. Group agents by their current action to find "Proximity"
+            const actionGroups = {};
+            for (const [agentId, state] of liveAgents.entries()) {
+                if (state.current_action) {
+                    if (!actionGroups[state.current_action]) actionGroups[state.current_action] = [];
+                    actionGroups[state.current_action].push({ id: agentId, state: state });
+                }
+            }
 
             // --- REAL-TIME EVENT LOGGING ---
             if (actionChanged && state.current_action_obj) {
@@ -1008,6 +1071,8 @@ async function tickLoop() {
                 });
             }
 
+            // processKnowledgeTransfer(liveAgents);
+
             // --- SAVE TO MONGODB ---
             if (needsChanged || actionChanged) {
                 const newSnapshot = new AgentSnapshot({
@@ -1029,7 +1094,7 @@ async function tickLoop() {
 let globalLastAccuracy = 0;
 
 // --- HEADLESS FAST-FORWARD (TRAINING LOOP) ---
-function fastForwardSim(ticksToRun, res, wasPaused) {
+function fastForwardSim(ticksToRun, res, wasPaused, targetAgentId) {
     const targetTick = simTick + ticksToRun;
     const chunkSize = 500; // Process 500 ticks before yielding to event loop
     
@@ -1044,7 +1109,7 @@ function fastForwardSim(ticksToRun, res, wasPaused) {
     const dynamicPerfectActions = {};
     
     orderedNeeds.forEach(need => {
-        let bestEffect = -Infinity;
+        let bestEffect = 0;
         let bestActionId = null;
 
         actionsCache.forEach(action => {
@@ -1058,6 +1123,7 @@ function fastForwardSim(ticksToRun, res, wasPaused) {
         });
 
         dynamicPerfectActions[need] = bestActionId;
+        console.log("Dynamic Perfect Actions Map:", dynamicPerfectActions);
     });
 
     // Fetch the specific agent we are examining
@@ -1112,6 +1178,8 @@ function fastForwardSim(ticksToRun, res, wasPaused) {
                     }
                 }
             }
+
+            // processKnowledgeTransfer(liveAgents);
 
             // --- PLOT GRAPH (Using the target agent's memory) ---
             if (simTick % GRAPH_WINDOW === 0 && targetAgent.action_history_window && targetAgent.action_history_window.length > 0) {

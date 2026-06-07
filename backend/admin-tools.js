@@ -171,7 +171,7 @@ function setupAdminSocketListeners() {
 }
 
 // 5. Utility Functions
-async function sendAdminCommand(action, value = null) {
+async function sendAdminCommand(action, value = null, agentId = null) {
     try {
         const payload = { action };
         if (value !== null) payload.value = value;
