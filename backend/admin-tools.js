@@ -33,8 +33,14 @@ function buildAdminPanel() {
                 <input type="number" id="input-bulk-create" class="admin-num-input" placeholder="amount">
             </div>
             <button id="btn-bulk-delete" class="admin-round-item" title="Bulk Delete">
-                <svg x="0px" y="0px" viewBox="0 0 64 64" style="enable-background:new 0 0 64 64; fill:#FFFFFF; stroke:#FFFFFF; stroke-width:0.8; stroke-miterlimit:10; padding: 4px;">
+                <svg x="0px" y="0px" viewBox="0 0 64 64" style="background-color: #0000; fill:#FFFFFF; stroke:#FFFFFF; stroke-width:0.8; stroke-miterlimit:10; padding: 4px;">
                     <path class="st0" d="M56,64l8-8L40,32L64,8l-8-8L32,24L8,0L0,8l24,24L0,56l8,8l24-24L56,64z"/>
+                </svg>
+            </button>
+            <button id="btn-reset-simulation" class="admin-round-item" title="Reset Simulation">
+                <svg fill="#ffffff" width="800px" height="800px" viewBox="0 0 32.00 32.00" id="icon" xmlns="http://www.w3.org/2000/svg" transform="rotate(0)" style="background-color: #0000;">
+                    <defs><style>.cls-1{fill:none;}</style></defs>
+                    <path d="M18,28A12,12,0,1,0,6,16v6.2L2.4,18.6,1,20l6,6,6-6-1.4-1.4L8,22.2V16H8A10,10,0,1,1,18,26Z"/>
                 </svg>
             </button>
         </div>
@@ -65,6 +71,7 @@ function setupAdminEventListeners() {
     const fastForwardInput = document.getElementById('input-fast-forward');
     const bulkCreateInput = document.getElementById('input-bulk-create');
     const bulkDeleteBtn = document.getElementById('btn-bulk-delete');
+    const resetSimBtn = document.getElementById('btn-reset-simulation');
 
     toggleBtn.addEventListener('click', () => panel.classList.toggle('open'));
 
@@ -80,34 +87,68 @@ function setupAdminEventListeners() {
 
     tickInput.addEventListener('keydown', async (e) => {
         if (e.key === 'Enter') {
-            const val = parseInt(tickInput.value);
-            if (!isNaN(val)) { await sendAdminCommand('set_tick', val); tickInput.blur(); }
+            const val = parseInt(tickInput.value.trim(), 10);
+            if (!isNaN(val)) {
+                await sendAdminCommand('set_tick', val);
+                tickInput.blur();
+            }
         }
     });
 
     speedInput.addEventListener('keydown', async (e) => {
         if (e.key === 'Enter') {
-            const val = parseInt(speedInput.value);
-            if (!isNaN(val)) { await sendAdminCommand('set_speed', val); speedInput.blur(); }
+            const val = parseInt(speedInput.value.trim(), 10);
+            if (!isNaN(val)) {
+                await sendAdminCommand('set_speed', val);
+                speedInput.blur();
+            }
         }
     });
 
     fastForwardInput.addEventListener('keydown', async (e) => {
         if (e.key === 'Enter') {
-            const val = parseInt(fastForwardInput.value);
-            if (!isNaN(val)) { await sendAdminCommand('fast_forward', val); fastForwardInput.blur(); }
+            const val = parseInt(fastForwardInput.value.trim(), 10);
+            if (!isNaN(val)) {
+                // Temporarily change input visual to show it's loading
+                const originalBg = fastForwardInput.style.background;
+                fastForwardInput.style.background = '#374151'; 
+                fastForwardInput.disabled = true;
+
+                const response = await sendAdminCommand('fast_forward', val, activeAgentId);
+                
+                // IF WE GOT EXAM DATA, RENDER THE MODAL
+                if (response && response.exam) renderExamModal(response.exam);
+
+                // Reset input
+                fastForwardInput.style.background = originalBg;
+                fastForwardInput.disabled = false;
+                fastForwardInput.blur();
+            }
         }
     });
 
     bulkCreateInput.addEventListener('keydown', async (e) => {
         if (e.key === 'Enter') {
-            const val = parseInt(bulkCreateInput.value);
-            if (!isNaN(val)) { await generateBulkAgents(val); bulkCreateInput.blur(); }
+            const val = parseInt(bulkCreateInput.value.trim(), 10);
+            if (!isNaN(val)) {
+                await generateBulkAgents(val);
+                bulkCreateInput.blur();
+            }
         }
     });
 
     bulkDeleteBtn.addEventListener('click', async () => {
         await cleanBulkAgents();
+    });
+
+    resetSimBtn.addEventListener('click', async () => {
+        if (confirm("Are you sure? This will reset the entire simulation, deleting all records and logs.")) {
+            try {
+                await sendAdminCommand('reset');
+            } catch(e) {
+                console.error("Error resetting:", e);
+            }
+        }
     });
 }
 
@@ -134,12 +175,20 @@ async function sendAdminCommand(action, value = null) {
     try {
         const payload = { action };
         if (value !== null) payload.value = value;
-        await fetch('/api/sim/control', {
+
+        if (agentId !== null) payload.agentId = agentId;
+
+        const res = await fetch('/api/sim/control', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-    } catch (err) { console.error("Admin command failed", err); }
+        // RETURN THE PARSED JSON
+        return await res.json(); 
+    } catch (err) {
+        console.error("Admin command failed", err);
+        return null;
+    }
 }
 
 function updatePlayPauseIcon() {

@@ -25,6 +25,7 @@ const app = express();
 const server = http.createServer(app); // NEW: Wrap Express in HTTP server
 const io = new Server(server); // NEW: Attach Socket.IO
 const PORT = process.env.PORT || 3000;
+let simTick = 0;
 
 // Middleware to parse incoming JSON and Form Data
 app.use(express.json());
@@ -86,20 +87,36 @@ const requireAdmin = async (req, res, next) => {
 // SIGN UP ENDPOINT (Replaces PHP/signup.php)
 app.post('/api/signup', async (req, res) => {
     try {
-        const { username, email, password, password2 } = req.body;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        let { username, email, password, password2 } = req.body;
+
+        // Data Sanitization (Trimming spaces and standardizing email case)
+        username = username ? username.trim() : '';
+        email = email ? email.trim().toLowerCase() : '';
 
         // Validation
         if (!username || !email || !password || !password2) {
             return res.status(400).json({ success: false, message: "All fields are required." });
         }
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ success: false, message: "Invalid email format." });
+        }
         if (password !== password2) {
             return res.status(400).json({ success: false, message: "Passwords do not match." });
         }
+        if (password.length < 6) {
+            return res.status(400).json({ success: false, message: "Password must be at least 6 characters long." });
+        }
 
         // Check if user already exists
-        const existingUser = await User.findOne({ username });
+        const existingUser = await User.findOne({ $or: [{ username: username }, { email: email }]});
+        
         if (existingUser) {
-            return res.status(409).json({ success: false, message: "Username already exists." });
+            if (existingUser.username === username) {
+                return res.status(409).json({ success: false, message: "Username already exists." });
+            } else {
+                return res.status(409).json({ success: false, message: "Email already in use." });
+            }
         }
 
         // Hash the password (10 salt rounds is standard)
@@ -113,11 +130,6 @@ app.post('/api/signup', async (req, res) => {
         });
         await newUser.save();
 
-        // Optional: Automatically log them in by setting the session
-        // req.session.user_id = newUser._id;
-        // req.session.username = newUser.username;
-
-        // Send success response (The frontend JS will handle the redirect)
         res.json({ success: true });
 
     } catch (error) {
@@ -136,7 +148,14 @@ app.post('/api/login', async (req, res) => {
         }
 
         // 1. Find the user
-        const user = await User.findOne({ username });
+        const identifier = username.trim();
+        const user = await User.findOne({
+            $or: [
+                { username: identifier }, 
+                { email: identifier.toLowerCase() }
+            ]
+        });
+
         if (!user) {
             return res.status(401).json({ success: false, message: "Username doesn't exist." });
         }
@@ -300,6 +319,64 @@ app.get('/api/agents/:id', async (req, res) => {
     }
 });
 
+// --- EDIT CHARACTER ENDPOINT ---
+app.put('/api/agents/:id', requireAuth, async (req, res) => {
+    try {
+        const agentId = req.params.id;
+        const { givenName, familyName, gender, age } = req.body;
+        
+        if (!givenName || !familyName) {
+            return res.status(400).json({ success: false, message: "Name fields are required." });
+        }
+
+        // Query with both ID and User to ensure they own the character
+        const agent = await Agent.findOne({ _id: agentId, user: req.session.userId });
+        
+        if (!agent) {
+            return res.status(404).json({ success: false, message: "Agent not found or unauthorized." });
+        }
+
+        // Update fields
+        agent.name = givenName;
+        agent.surname = familyName;
+        if (gender) agent.gender = gender;
+        if (age) agent.age = age;
+
+        await agent.save();
+        res.json({ success: true, agent });
+
+    } catch (error) {
+        logAndEmitError("Agent edit error:", error);
+        res.status(500).json({ success: false, message: "Internal server error." });
+    }
+});
+
+// --- DELETE CHARACTER ENDPOINT ---
+app.delete('/api/agents/:id', requireAuth, async (req, res) => {
+    try {
+        const agentId = req.params.id;
+        
+        // Verify ownership first
+        const agent = await Agent.findOne({ _id: agentId, user: req.session.userId });
+        if (!agent) {
+            return res.status(404).json({ success: false, message: "Agent not found or unauthorized." });
+        }
+
+        // 1. Remove from the active simulation RAM (so it stops ticking)
+        liveAgents.delete(agentId.toString());
+
+        // 2. Purge from the database
+        await AgentSnapshot.deleteMany({ agent: agentId });
+        await EventLog.deleteMany({ agent: agentId });
+        await Agent.deleteOne({ _id: agentId });
+
+        res.json({ success: true, message: "Agent deleted." });
+    } catch (error) {
+        logAndEmitError("Agent delete error:", error);
+        res.status(500).json({ success: false, message: "Internal server error." });
+    }
+});
+
 // --- BULK CHARACTER CREATION (API REQUIREMENT) ---
 app.post('/api/agents/bulk', requireAdmin, async (req, res) => {
     try {
@@ -421,7 +498,7 @@ app.delete('/api/agents/bulk', requireAdmin, async (req, res) => {
 
 app.post('/api/sim/control', requireAdmin, async (req, res) => {
     // Make sure you have an auth check here in production!
-    const { action, value } = req.body;
+    const { action, value, agentId } = req.body;
 
     try {
         if (action === 'pause') {
@@ -445,17 +522,57 @@ app.post('/api/sim/control', requireAdmin, async (req, res) => {
             startSimulation(newSpeed);
             return res.json({ success: true, currentInterval: newSpeed });
 
-        }else if (action === 'fast_forward') {
+        } else if (action === 'fast_forward') {
             const ticksToRun = parseInt(value) || 10000;
             const wasPaused = simPaused;
             simPaused = true;
 
-            fastForwardSim(ticksToRun, res);
+            fastForwardSim(ticksToRun, res, wasPaused, agentId);
             simPaused = wasPaused;
             // Return immediately so we don't hit any other res.json below!
             return;
 
-        } else {
+        } else if (action === 'reset') {
+            simPaused = true;
+            await redisClient.set('sim:paused', 'true');
+
+            simTick = 1;
+            await redisClient.set('sim:tick', simTick);
+
+            await AgentSnapshot.deleteMany({});
+            await EventLog.deleteMany({});
+
+            for (const [agentId, state] of liveAgents.entries()) {
+                state.needs = { hunger: 100, thirst: 100, bladder: 100, hygiene: 100, sleep: 100, health: 100 };
+                state.emotions = { joy: 50, sadness: 0, anger: 0, fear: 0 };
+                state.current_action = null;
+                state.busy_until = 0;
+                state.current_action_obj = null;
+                state.current_action_per_tick = null;
+                state.last_action_urgencies = {};
+                state.last_action_id = null;
+                state.discomfort_at_start = 0;
+                state.action_duration_ticks = 1;
+                state.lfa_weights = {};
+
+                const urgencies = {};
+                for (const [key, val] of Object.entries(state.needs)) {
+                    urgencies[key] = getUrgencyForNeed(key, val);
+                }
+
+                io.emit('agent_update', {
+                    agentId: agentId,
+                    needs: state.needs,
+                    urgencies: urgencies,
+                    emotions: state.emotions
+                });
+            }
+            
+            io.emit('sim_update', { tick: simTick });
+
+            return res.json({ success: true, message: "Simulation reset to Tick 1 and history wiped.", simTick, simPaused });
+
+        }else {
             return res.status(400).json({ success: false, message: "Invalid action" });
         }
 
@@ -483,6 +600,7 @@ app.get('/api/config', requireAuth, (req, res) => {
 io.on('connection', (socket) => {
     // When a user logs in and the frontend sees they are an admin,
     // it will emit this event to subscribe to real-time server errors.
+    socket.emit('initialTickSync', simTick);
     socket.on('join_admin_room', () => {
         socket.join('admins');
         logAndEmitError(`Admin joined debugging room: ${socket.id}`);
@@ -615,8 +733,6 @@ function getCircadianMultiplier(currentSimTick) {
 }
 
 // --- THE GAME LOOP (SIMULATION TICK) ---
-
-let simTick = 0;
 let simPaused = true; // Let's start paused by default so it doesn't run away from you!
 
 // 1. Load the last known state from Redis on startup
@@ -659,8 +775,10 @@ async function initializeSimulationState() {
         actionsCache = await Action.find({}).populate({ path: 'object', model: 'ObjectEntry' });
         console.log(`Loaded ${actionsCache.length} actions into RAM.`);
 
-        // 2. Load all agents
-        for (const [agentId, state] of liveAgents.entries()) {
+        // 2. Load all agents from the database first!
+        const allAgents = await Agent.find({});
+        
+        for (const agent of allAgents) {
             let snap = await AgentSnapshot.findOne({ agent: agent._id }).sort({ timestamp: -1 });
             
             // Your brilliant initialization block for new agents!
@@ -680,15 +798,17 @@ async function initializeSimulationState() {
                 needs: snap.needs.toObject ? snap.needs.toObject() : snap.needs,
                 emotions: snap.emotions.toObject ? snap.emotions.toObject() : snap.emotions,
                 current_action: snap.current_action,
-                busy_until: 0, // Tracks what tick the agent becomes free
-                current_action_obj: null, // Holds the full action data while busy
-                current_action_per_tick: null, // Stores the divided fraction
+                busy_until: 0, 
+                current_action_obj: null, 
+                current_action_per_tick: null, 
                 // --- AI TRACKING VARIABLES ---
                 lfa_weights: snap.lfa_weights ? Object.fromEntries(snap.lfa_weights) : {},
-                last_action_urgencies: {}, // To store how they felt before the action
-                last_action_id: null, // To know which weights to update
+                last_action_urgencies: {}, 
+                last_action_id: null, 
                 discomfort_at_start: 0,
-                action_duration_ticks: 1
+                action_duration_ticks: 1,
+                action_history_window: [], 
+                last_accuracy: 0
             });
         }
         console.log(`Successfully loaded ${liveAgents.size} agents into RAM.`);
@@ -710,6 +830,9 @@ let currentInterval = 1000; // Milliseconds
 function processAgentTick(agentId, state, currentTick) {
     let needsChanged = false;
     let actionChanged = false;
+    let rewardGained = null;
+    let dominantUrgency = null;
+    let chosenActionName = null;
 
     // --- 1. APPLY PASSIVE DECAY ---
     const needNames = ['hunger', 'thirst', 'bladder', 'hygiene', 'sleep'];
@@ -722,32 +845,8 @@ function processAgentTick(agentId, state, currentTick) {
         }
     }
 
-    // --- Helper to get live urgencies for AI decisions ---
-    const currentUrgencies = {};
-    const currentPriorities = {};
-    const circMult = getCircadianMultiplier(currentTick);
-
-    for (const [key, val] of Object.entries(state.needs)) {
-        currentUrgencies[key] = getUrgencyForNeed(key, val);
-        let p = (ruleSet.needs[key] && ruleSet.needs[key].priority !== undefined) ? ruleSet.needs[key].priority : 1;
-        if (key === 'sleep') p = p * circMult;
-        currentPriorities[key] = p;
-    }
-
-    // --- 2. ACTION LOGIC (Phase A: Learning) ---
-    if (currentTick === state.busy_until && state.last_action_id) {
-        const discomfortAfter = calculateTotalDiscomfort(currentUrgencies, currentPriorities);
-        const reward = calculateReward(state.discomfort_at_start, discomfortAfter, state.action_duration_ticks);
-        
-        state.lfa_weights = updateWeights(
-            state.lfa_weights,
-            state.last_action_id,
-            state.last_action_urgencies,
-            reward
-        );
-    }
-
-    // Apply the active effects of the current action while it runs
+    // --- 2. APPLY ACTIVE EFFECTS (MOVED UP!) ---
+    // The agent must feel the effect before calculating urgencies and learning.
     if (state.current_action_obj && state.current_action_per_tick && currentTick <= state.busy_until) {
         const e = state.current_action_per_tick;
         for (const need of needNames) {
@@ -757,35 +856,114 @@ function processAgentTick(agentId, state, currentTick) {
         needsChanged = true;
     }
 
-    // --- 3. ACTION LOGIC (Phase B: Decision) ---
+    // --- 3. CALCULATE LIVE URGENCIES ---
+    const currentUrgencies = {};
+    const currentPriorities = {};
+    const circMult = getCircadianMultiplier(currentTick);
+
+    for (const [key, val] of Object.entries(state.needs)) {
+        if (key === 'health') continue;
+        currentUrgencies[key] = getUrgencyForNeed(key, val);
+        let p = (ruleSet.needs[key] && ruleSet.needs[key].priority !== undefined) ? ruleSet.needs[key].priority : 1;
+        if (key === 'sleep') p = p * circMult;
+        currentPriorities[key] = p;
+    }
+
+    // --- 4. ACTION LOGIC (Phase A: Learning) ---
+    if (currentTick === state.busy_until && state.last_action_id) {
+        
+        // Generate the exact report card for how this action affected every need
+        const needRewards = {};
+        let totalRewardForGraph = 0;
+
+        state.learning_steps = (state.learning_steps || 0) + 1;
+
+        for (const need in currentUrgencies) {
+            // Did the urgency go down? If yes, positive reward.
+            const urgencyBefore = state.last_action_urgencies[need] || 0;
+            const urgencyAfter = currentUrgencies[need] || 0;
+
+            // ASYMMETRIC REWARD BOUNDING
+            let delta = urgencyBefore - urgencyAfter;
+            
+            if (delta <= 0) {
+                // If the need got worse due to passive time decay, 
+                // cap the punishment at -0.05 so we don't cause "time phobia".
+                delta = Math.max(delta, -0.05);
+            } else {
+                // If the action actively relieved the need, apply the 
+                // initiation tax to prevent micro-action spam.
+                delta -= 0.05;
+            }
+            
+            // Subtract a tiny 0.05 penalty to prevent spamming micro-actions
+            // const delta = (urgencyBefore - urgencyAfter) - 0.05; // <-- This is the old line before asymmetric bounding
+            
+            needRewards[need] = delta;
+            totalRewardForGraph += delta; 
+        }
+
+        rewardGained = totalRewardForGraph; // Feed the total sum to your exam graph
+        
+        // Update the brain using the specific report card
+        state.lfa_weights = updateWeights(
+            state.lfa_weights,
+            state.last_action_id,
+            state.last_action_urgencies,
+            needRewards
+        );
+    }
+
+    // --- 5. ACTION LOGIC (Phase B: Decision) ---
     if (currentTick >= state.busy_until && actionsCache.length > 0) {
-        // Capture the "Before" State for the next learning phase
         state.discomfort_at_start = calculateTotalDiscomfort(currentUrgencies, currentPriorities);
         state.last_action_urgencies = { ...currentUrgencies };
         
-        // AI Decision (Epsilon-Greedy)
-        const chosenAction = selectAction(actionsCache, currentUrgencies, state.lfa_weights);
+        let highestUrg = 0;
+        dominantUrgency = null; 
+        for (const need in currentUrgencies) {
+            const finalUrg = currentUrgencies[need] * (currentPriorities[need] || 1);
+            if (finalUrg > highestUrg) {
+                highestUrg = finalUrg;
+                dominantUrgency = need;
+            }
+        }
+
+        // --- NEW: Calculate Epsilon Decay ---
+        // Starts at 0.25 (25%), decays gradually, and floors at 0.03 (3%) 
+        // after the agent has taken 2,200 actions.
+        const minEpsilon = 0.03; 
+        const startingEpsilon = 0.25;
+        const decayRate = 0.0001; 
+        
+        const agentEpsilon = Math.max(
+            minEpsilon, 
+            startingEpsilon - ((state.learning_steps || 0) * decayRate)
+        );
+
+        const chosenAction = selectAction(actionsCache, currentUrgencies, state.lfa_weights, agentEpsilon);
         
         state.current_action = chosenAction._id;
         state.current_action_obj = chosenAction;
         state.last_action_id = chosenAction._id.toString();
+        
+        // Extract the object name for the matrix
+        const objectName = chosenAction.object ? chosenAction.object.name : "";
+        chosenActionName = `${chosenAction.name} ${objectName}`.trim();
 
         const ticksNeeded = Math.max(1, Math.ceil(chosenAction.duration / 10));
         state.busy_until = currentTick + ticksNeeded;
         state.action_duration_ticks = ticksNeeded;
         actionChanged = true;
 
-        // Calculate Per-Tick Effect
-        const effect = chosenAction.needs_effect || {};
         state.current_action_per_tick = {};
+        const effect = chosenAction.needs_effect || {};
         for (const need of [...needNames, 'health']) {
             state.current_action_per_tick[need] = (effect[need] || 0) / ticksNeeded;
         }
-
-        // Only log to DB if we are NOT fast-forwarding (checked by caller)
     }
 
-    return { needsChanged, actionChanged };
+    return { needsChanged, actionChanged, rewardGained, dominantUrgency, chosenActionName };
 }
 
 async function tickLoop() {
@@ -848,11 +1026,52 @@ async function tickLoop() {
     }
 }
 
+let globalLastAccuracy = 0;
+
 // --- HEADLESS FAST-FORWARD (TRAINING LOOP) ---
-function fastForwardSim(ticksToRun, res) {
+function fastForwardSim(ticksToRun, res, wasPaused) {
     const targetTick = simTick + ticksToRun;
     const chunkSize = 500; // Process 500 ticks before yielding to event loop
     
+    // EXAM TRACKERS
+    const orderedNeeds = ['hunger', 'thirst', 'bladder', 'sleep', 'hygiene'];
+    const examResults = { accuracyHistory: [], actionMatrix: {} };
+    const MAX_HISTORY = 100;
+
+    const GRAPH_WINDOW = Math.max(1, Math.round(ticksToRun / 100)); // Drawing 100 points scattered evenly across the fast-forward duration
+    orderedNeeds.forEach(need => examResults.actionMatrix[need] = {});
+
+    const dynamicPerfectActions = {};
+    
+    orderedNeeds.forEach(need => {
+        let bestEffect = -Infinity;
+        let bestActionId = null;
+
+        actionsCache.forEach(action => {
+            // Check how much this action satisfies the current need
+            const effect = (action.needs_effect && action.needs_effect[need]) ? action.needs_effect[need] : 0;
+            
+            if (effect > bestEffect) {
+                bestEffect = effect;
+                bestActionId = action._id.toString();
+            }
+        });
+
+        dynamicPerfectActions[need] = bestActionId;
+    });
+
+    // Fetch the specific agent we are examining
+    const targetAgent = liveAgents.get(targetAgentId);
+    if (!targetAgent) {
+        return res.status(400).json({ success: false, message: "No valid agent selected for exam." });
+    }
+    
+    // Push the starting point using THIS specific agent's saved accuracy
+    examResults.accuracyHistory.push({
+        tick: simTick,
+        accuracy: targetAgent.last_accuracy || 0
+    });
+
     // Save "Before" Snapshot for all agents
     for (const [agentId, state] of liveAgents.entries()) {
         new AgentSnapshot({
@@ -867,9 +1086,44 @@ function fastForwardSim(ticksToRun, res) {
             simTick++;
             ticksProcessedThisChunk++;
 
-            // Run the core logic ONLY. No DB saves, no socket emits.
+            // 1. Process all agents for this tick
             for (const [agentId, state] of liveAgents.entries()) {
-                processAgentTick(agentId, state, simTick);
+                const result = processAgentTick(agentId, state, simTick);
+                
+                // --- EXAM GRADING (STRICTLY FOR THE TARGET AGENT) ---
+                if (agentId === targetAgentId) {
+                    if (result.actionChanged && result.dominantUrgency && result.chosenActionName) {
+                        const need = result.dominantUrgency.toLowerCase();
+                        const expectedActionId = dynamicPerfectActions[need];
+                        const isCorrect = (state.last_action_id === expectedActionId) ? 1 : 0;
+
+                        // Ensure the array exists, push, and trim
+                        if (!state.action_history_window) state.action_history_window = [];
+                        state.action_history_window.push(isCorrect);
+                        if (state.action_history_window.length > MAX_HISTORY) {
+                            state.action_history_window.shift();
+                        }
+
+                        // Confusion Matrix updating
+                        const actionNameForMatrix = result.chosenActionName || "Unknown Action";
+                        if (!examResults.actionMatrix[need]) examResults.actionMatrix[need] = {};
+                        if (!examResults.actionMatrix[need][result.chosenActionName]) examResults.actionMatrix[need][result.chosenActionName] = 0;
+                        examResults.actionMatrix[need][result.chosenActionName]++;
+                    }
+                }
+            }
+
+            // --- PLOT GRAPH (Using the target agent's memory) ---
+            if (simTick % GRAPH_WINDOW === 0 && targetAgent.action_history_window && targetAgent.action_history_window.length > 0) {
+                const sum = targetAgent.action_history_window.reduce((a, b) => a + b, 0);
+                
+                // Save the new accuracy directly to the agent
+                targetAgent.last_accuracy = Math.round((sum / targetAgent.action_history_window.length) * 100 * 10) / 10;
+
+                examResults.accuracyHistory.push({ 
+                    tick: simTick, 
+                    accuracy: targetAgent.last_accuracy
+                });
             }
         }
 
@@ -878,22 +1132,43 @@ function fastForwardSim(ticksToRun, res) {
             setImmediate(processChunk);
         } else {
             // Done! Save "After" Snapshot and finalize.
+            simPaused = wasPaused;
             redisClient.set('sim:tick', simTick);
             
             for (const [agentId, state] of liveAgents.entries()) {
+                
+                // --- 1. CALCULATE MISSING FRONTEND DATA ---
+                const finalUrgencies = {};
+                const finalPriorities = {};
+                const circMult = getCircadianMultiplier(simTick);
+                
+                for (const [key, val] of Object.entries(state.needs)) {
+                    finalUrgencies[key] = getUrgencyForNeed(key, val);
+                    let p = (ruleSet.needs[key] && ruleSet.needs[key].priority !== undefined) ? ruleSet.needs[key].priority : 1;
+                    if (key === 'sleep') p = p * circMult;
+                    finalPriorities[key] = p;
+                }
+
+                // --- 2. SAVE & EMIT ---
                 new AgentSnapshot({
                     agent: agentId, tick: simTick, needs: state.needs, emotions: state.emotions, lfa_weights: state.lfa_weights
                 }).save().catch(err => logAndEmitError('Error saving agent snapshot:', err));
                 
-                // Blast final state to the UI
-                io.emit('agent_update', { agentId: agentId, needs: state.needs, emotions: state.emotions });
+                const socketPayload = { 
+                    agentId: agentId, 
+                    needs: state.needs, 
+                    urgencies: finalUrgencies, 
+                    priorities: finalPriorities,
+                    emotions: state.emotions 
+                };
+
+                io.emit('agent_update', socketPayload);
             }
             
             io.emit('sim_update', { tick: simTick });
             console.log(`Fast-forward complete. Reached tick ${simTick}`);
             
-            // Send response back to the admin who triggered it
-            res.json({ success: true, message: `Fast-forwarded ${ticksToRun} ticks.`, newTick: simTick });
+            res.json({ success: true, message: `Fast-forwarded ${ticksToRun} ticks.`, newTick: simTick, exam: examResults });
         }
     }
 

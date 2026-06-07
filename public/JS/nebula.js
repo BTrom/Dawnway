@@ -22,6 +22,9 @@
     const COMET_MODE = "ellipse"; // "trail" | "ellipse"
 
     const CONFIG = {
+        paused: false,
+        showComets: true,
+
         // General
         bgColor: "rgb(8, 8, 8)",
         fpsCap: 30,
@@ -297,18 +300,22 @@
     let cometAccumulator = 0;
 
     function loop(now) {
+        if (CONFIG.paused) return;
+
         const dtMs = now - lastTime;
         lastTime = now;
         accumulator += dtMs;
         cometAccumulator += dtMs;
 
-        const cometPeriodMs = CONFIG.cometAverageSeconds * 1000;
-        if (cometAccumulator >= cometPeriodMs) {
-            spawnComet();
-            cometAccumulator = 0;
-        } else {
-            const chance = (dtMs / cometPeriodMs) * 1.5;
-            if (Math.random() < chance * 0.1) spawnComet();
+        if (CONFIG.showComets) {
+            const cometPeriodMs = CONFIG.cometAverageSeconds * 1000;
+            if (cometAccumulator >= cometPeriodMs) {
+                spawnComet();
+                cometAccumulator = 0;
+            } else {
+                const chance = (dtMs / cometPeriodMs) * 1.5;
+                if (Math.random() < chance * 0.1) spawnComet();
+            }
         }
 
         while (accumulator >= frameInterval) {
@@ -536,6 +543,22 @@
     }
 
     requestAnimationFrame(loop);
+
+    window.NebulaAPI = {
+        setPaused: function(state) {
+            if (state && !CONFIG.paused) {
+                CONFIG.paused = true;
+            } else if (!state && CONFIG.paused) {
+                CONFIG.paused = false;
+                lastTime = performance.now(); // Reset timer to prevent a massive jump catch-up
+                requestAnimationFrame(loop);
+            }
+        },
+        toggleComets: function(state) {
+            CONFIG.showComets = state;
+            if (!state) comets.length = 0; // Instantly clear existing comets
+        }
+    };
 })();
 
 // --- STAR STYLING
@@ -688,13 +711,13 @@ async function resetTitle() {
 
 // Form opening and element creation for the DOM
 async function openForm(button) {
-    fields = button === 'login' ? ['username', 'password'] : ['username', 'password', 'password2'];
-    cssFormHeight = (fields.length * 106) + 55 + (cssFormPadding * 2); // field height + submit button + padding
+    let fields = button === 'login' ? ['username', 'password'] : ['username', 'email', 'password', 'password2'];
+    cssFormHeight = (fields.length * 106) + 55 + (cssFormPadding * 2); 
     document.documentElement.style.setProperty('--form-height', `${cssFormHeight}px`);
-    // Form Element
+    
     form = document.createElement('form');
     form.id = 'auth-form';
-    // Submit Button Element
+    
     submitButton = document.createElement('button');
     submitButton.setAttribute('form', 'auth-form');
     submitButton.type = 'submit';
@@ -702,16 +725,14 @@ async function openForm(button) {
     submitButton.textContent = button === 'login' ? 'Log In' : 'Sign Up';
     submitButton.disabled = true;
 
-    // Form positioning
     const contentRect = contentBox.getBoundingClientRect();
     const buttonRect = button === 'login' ? leftButton.getBoundingClientRect() : rightButton.getBoundingClientRect();
 
     const formLeft = buttonRect.left - contentRect.left;
-    const formTop = buttonRect.top - contentRect.top + (3 * 16); // Don't know why it only works with 3rem offset and not the actual distance
+    const formTop = buttonRect.top - contentRect.top + (3 * 16); 
     form.style.setProperty("--start-left", `${formLeft}px`);
     form.style.setProperty("--start-top", `${formTop}px`);
 
-    // Submit button positioning
     const submitLeft = buttonRect.left - contentRect.left;
     const submitTop = buttonRect.top - contentRect.top;
     submitButton.style.left = submitLeft + "px";
@@ -722,19 +743,30 @@ async function openForm(button) {
 
     contentBox.appendChild(form);
     form.classList.add('auth-form');
-
     contentBox.appendChild(submitButton);
 
     await new Promise(resolve => setTimeout(resolve, 500));
-    formHtml = '';
+
+    let formHtml = '';
     fields.forEach(e => {
+        // Assign the correct input type (using HTML5 email validation as a first line of defense)
+        let inputType = "text";
+        if (e === "password" || e === "password2") inputType = "password";
+        if (e === "email") inputType = "email";
+
+        // Generate the label text dynamically
+        let labelText = e.charAt(0).toUpperCase() + e.slice(1);
+        if (e === "password2") labelText = "Repeat Password";
+        if (e === "username" && button === "login") labelText = "Username or Email";
+
         formHtml += `
             <label for="${e}">
-                <p>${e != "password2" ? e.charAt(0).toUpperCase() + e.slice(1) : "Repeat Password"}:</p>
-                <input type="${e === "password" || e === "password2" ? "password" : "text"}" name="${e}" id="auth-form-${e}" required>
+                <p>${labelText}:</p>
+                <input type="${inputType}" name="${e}" id="auth-form-${e}" required>
             </label>
         `;
     });
+    
     form.innerHTML = formHtml;
     let formFields = form.querySelectorAll('label');
     formFields.forEach(field => {
@@ -745,59 +777,65 @@ async function openForm(button) {
 
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
-        console.log("=== FORM SUBMISSION TRIGGERED ===");
         
-        // Convert FormData to a standard JSON object
         const formData = new FormData(form);
         const dataPayload = Object.fromEntries(formData.entries());
         
+        // Frontend Sanitization: Trim trailing/leading spaces from all payload data
+        for (let key in dataPayload) {
+            dataPayload[key] = dataPayload[key].trim();
+        }
+        
         const targetUrl = button === 'login' ? '/api/login' : '/api/signup';
-        console.log(`Targeting URL: ${targetUrl}`);
-        console.log(`Payload being sent:`, dataPayload);
 
         try {
             const response = await fetch(targetUrl, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json' // Tell Node.js to expect JSON
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(dataPayload)
             });
-            console.log(`Backend Response Status: ${response.status}`);
 
             const result = await response.json();
-            console.log(`Backend Response JSON:`, result);
 
             if (result.success) {
-                console.log("Success! Redirecting to home.php...");
-                window.location.href = "/home.html"; // Make sure this points to your new .html file!
+                window.location.href = "/home.html";
             } else {
                 console.warn("Backend rejected the submission:", result.message);
+                
+                // Clear previous red borders
+                formFields.forEach(label => {
+                    const input = label.querySelector('input');
+                    if (input) input.style.borderColor = "";
+                });
+
+                // Map specific backend errors to UI highlighting
                 if (button === "login") {
-                    if (result.message === "Invalid request.") {
-                        alert("Invalid request.");
-                    } else if (result.message === "Username doesn't exist.") {
-                        let input = formFields[0].getElementsByTagName('input')[0];
+                    if (result.message === "Account doesn't exist.") {
+                        let input = formFields[0].querySelector('input');
                         input.style.borderColor = "#ff4d4d";
-                        formFields[0].innerHTML = formFields[0].innerHTML.replace("Username:", `Username: <span style="color: #ff4d4d">Username doesn't exist</span>`);
+                        formFields[0].innerHTML = formFields[0].innerHTML.replace("Username or Email:", `Username or Email: <span style="color: #ff4d4d">Account doesn't exist</span>`);
                     } else if (result.message === "Incorrect password.") {
-                        let input = formFields[1].getElementsByTagName('input')[1];
+                        let input = formFields[1].querySelector('input');
                         input.style.borderColor = "#ff4d4d";
                         formFields[1].innerHTML = formFields[1].innerHTML.replace("Password:", `Password: <span style="color: #ff4d4d">Incorrect password</span>`);
                     }
                 } else {
-                    if (result.message === "Invalid request.") {
-                        alert("Invalid request.");
-                    } else if (result.message === "Passwords do not match.") {
-                        let input = formFields[1].getElementsByTagName('input')[0];
-                        input.style.borderColor = "#ff4d4d";
-                        input = formFields[2].getElementsByTagName('input')[0];
-                        input.style.borderColor = "#ff4d4d";
-                        formFields[1].innerHTML = formFields[1].innerHTML.replace("Password:", `Password: <span style="color: #ff4d4d">Passwords do not match</span>`);
+                    if (result.message === "Passwords do not match.") {
+                        formFields[2].querySelector('input').style.borderColor = "#ff4d4d";
+                        formFields[3].querySelector('input').style.borderColor = "#ff4d4d";
+                        formFields[2].innerHTML = formFields[2].innerHTML.replace("Password:", `Password: <span style="color: #ff4d4d">Passwords do not match</span>`);
                     } else if (result.message === "Username already exists.") {
-                        let input = formFields[0].getElementsByTagName('input')[0];
-                        input.style.borderColor = "#ff4d4d";
+                        formFields[0].querySelector('input').style.borderColor = "#ff4d4d";
                         formFields[0].innerHTML = formFields[0].innerHTML.replace("Username:", `Username: <span style="color: #ff4d4d">Username already exists</span>`);
+                    } else if (result.message === "Email already in use.") {
+                        formFields[1].querySelector('input').style.borderColor = "#ff4d4d";
+                        formFields[1].innerHTML = formFields[1].innerHTML.replace("Email:", `Email: <span style="color: #ff4d4d">Email already in use</span>`);
+                    } else if (result.message === "Invalid email format.") {
+                        formFields[1].querySelector('input').style.borderColor = "#ff4d4d";
+                        formFields[1].innerHTML = formFields[1].innerHTML.replace("Email:", `Email: <span style="color: #ff4d4d">Invalid format</span>`);
+                    } else if (result.message === "Password must be at least 6 characters.") {
+                        formFields[2].querySelector('input').style.borderColor = "#ff4d4d";
+                        formFields[2].innerHTML = formFields[2].innerHTML.replace("Password:", `Password: <span style="color: #ff4d4d">Too short (min 6)</span>`);
                     }
                 }
             }

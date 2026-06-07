@@ -1,4 +1,3 @@
-const EPSILON = 0.2; // 20% of the time, pick randomly to explore and learn
 const ALPHA = 0.1;   // How fast they learn (Learning Rate)
 
 /**
@@ -26,7 +25,8 @@ function calculateReward(discomfortBefore, discomfortAfter, durationTicks) {
     // REWARD HACKING FIX: 
     // 1. Normalize by time so they prefer efficient actions.
     // 2. Subtract a flat 0.5 initiation penalty so they don't spam micro-actions.
-    const normalizedReward = (rawDelta / durationTicks) - 0.5;
+    // const normalizedReward = (rawDelta / durationTicks) - 0.5;
+    const normalizedReward = rawDelta - 0.1;
     
     return normalizedReward;
 }
@@ -35,20 +35,27 @@ function calculateReward(discomfortBefore, discomfortAfter, durationTicks) {
  * Updates the agent's memory (weights) using Gradient Descent.
  * New Weight = Old Weight + (Learning_Rate * Reward * Urgency_At_The_Time)
  */
-function updateWeights(weightsMap, lastActionId, lastUrgencies, reward) {
+function updateWeights(weightsMap, lastActionId, lastUrgencies, needRewards) {
     for (const need in lastUrgencies) {
         const urgencyAtStart = lastUrgencies[need];
 
-        // Only update if the urgency was actually present
+        // We only update the weight if the need was actively felt
         if (urgencyAtStart > 0) {
-            const weightKey = `${lastActionId}_${need}`; // e.g., "actionID_thirst"
+            const weightKey = `${lastActionId}_${need}`;
             const currentWeight = weightsMap[weightKey] || 0;
 
-            // Expected reward for a blank slate is 0, so Error = Actual Reward
-            const error = reward;
+            const actualReward = needRewards[need] || 0;
+            const predictedQ = currentWeight * urgencyAtStart;
+            const error = actualReward - predictedQ;
 
-            // Apply gradient descent
-            const newWeight = currentWeight + (ALPHA * error * urgencyAtStart);
+            // Gradient Descent
+            let newWeight = currentWeight + (ALPHA * error * urgencyAtStart);
+
+            // Weight Clipping (Regularization)
+            // Prevents weights from exploding to infinity when urgencyAtStart is near 0.
+            // Bounding between -5.0 and 5.0 provides a stable matrix.
+            newWeight = Math.max(-5.0, Math.min(5.0, newWeight));
+
             weightsMap[weightKey] = newWeight;
         }
     }
@@ -58,9 +65,9 @@ function updateWeights(weightsMap, lastActionId, lastUrgencies, reward) {
 /**
  * Selects an action using Epsilon-Greedy logic based on Q-Values.
  */
-function selectAction(actionsCache, urgencies, weightsMap) {
-    // EXPLORE: Pick randomly
-    if (Math.random() < EPSILON) {
+function selectAction(actionsCache, urgencies, weightsMap, currentEpsilon) {
+    // EXPLORE: Pick randomly using the agent's dynamic epsilon
+    if (Math.random() < currentEpsilon) {
         return actionsCache[Math.floor(Math.random() * actionsCache.length)];
     }
 
@@ -73,7 +80,7 @@ function selectAction(actionsCache, urgencies, weightsMap) {
         
         // Calculate Q-Value: Sum of (Weight * Current Urgency)
         for (const need in urgencies) {
-            const weightKey = `${action.id}_${need}`;
+            const weightKey = `${action._id}_${need}`;
             const weight = weightsMap[weightKey] || 0;
             qValue += weight * urgencies[need];
         }

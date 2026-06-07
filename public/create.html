@@ -96,33 +96,63 @@
         const ageVal = document.getElementById('age-val');
         const initForm = document.getElementById('character-init-form');
 
+        // Update age display on slide
         slider.addEventListener('input', function() {
             ageVal.textContent = this.value;
         });
 
-        initForm.addEventListener('submit', async (event) => {
-            event.preventDefault(); // Stops the page refresh!
+        // --- EDIT MODE LOGIC ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const editAgentId = urlParams.get('edit');
 
-            // Gather the data using the 'name' attributes
+        if (editAgentId) {
+            // Transform UI into Edit Mode
+            document.querySelector('.init-title').textContent = 'Edit Character';
+            document.querySelector('.init-subtitle').textContent = 'Modify biometrics for existing agent.';
+            document.querySelectorAll('.init-submit').forEach(btn => btn.innerHTML = 'SAVE &rarr;');
+
+            // Fetch existing data and pre-fill form
+            fetch(`/api/agents/${editAgentId}`)
+                .then(res => res.json())
+                .then(result => {
+                    if (result.success) {
+                        const agent = result.agent;
+                        document.querySelector('input[name="givenName"]').value = agent.name;
+                        document.querySelector('input[name="familyName"]').value = agent.surname;
+                        
+                        document.querySelectorAll('input[name="gender"]').forEach(radio => {
+                            if (radio.value === agent.gender) radio.checked = true;
+                        });
+
+                        slider.value = agent.age;
+                        ageVal.textContent = agent.age;
+                    }
+                })
+                .catch(err => console.error("Failed to load agent for editing:", err));
+        }
+
+        // --- FORM SUBMISSION ---
+        initForm.addEventListener('submit', async (event) => {
+            event.preventDefault(); 
+
             const formData = new FormData(initForm);
             const dataPayload = Object.fromEntries(formData.entries());
 
-            // Log it so you can see it in DevTools
-            console.log("Form data:", dataPayload);
+            // Determine route and method dynamically based on mode
+            const endpoint = editAgentId ? `/api/agents/${editAgentId}` : '/api/creator';
+            const method = editAgentId ? 'PUT' : 'POST';
 
             try {
-                const response = await fetch('/api/creator', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                const response = await fetch(endpoint, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(dataPayload)
                 });
 
                 const result = await response.json();
 
                 if (result.success) {
-                    window.location.href = '/home.html'; // Redirect back to dashboard
+                    window.location.href = '/home.html'; 
                 } else {
                     alert("Error: " + result.message);
                 }
