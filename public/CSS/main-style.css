@@ -1245,7 +1245,7 @@ button.init-submit {
     margin-bottom: 1rem;
     padding: 1rem;
     background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(12px);
+    /* backdrop-filter: blur(12px); */
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 0.5rem;
     display: flex;
@@ -1390,7 +1390,7 @@ button.init-submit {
     transform: translateY(-50%);
     width: 70px;
     background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(12px);
+    /* backdrop-filter: blur(12px); */
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-right: none;
     border-radius: 1rem 0 0 1rem;
@@ -1414,7 +1414,7 @@ button.init-submit {
     width: 32px;
     height: 48px;
     background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(12px);
+    /* backdrop-filter: blur(12px); */
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-right: none;
     border-radius: 0.5rem 0 0 0.5rem;
@@ -1637,4 +1637,85 @@ button.admin-round-item svg {
         margin-top: 0;
         margin-bottom: 2.5rem;
     }
+}
+
+/* --- AI EXAM MODAL STYLES --- */
+.hide-scroll {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+}
+.hide-scroll::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+}
+
+.exam-matrix-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    text-align: center;
+    font-family: "Courier Prime", monospace;
+    font-size: 0.85rem;
+    color: #fff;
+}
+
+/* Apply bottom borders to individual cells instead of rows */
+.exam-matrix-table th, 
+.exam-matrix-table td {
+    border-bottom: 1px dashed rgba(255, 255, 255, 0.3);
+    padding: 1rem 0.5rem;
+}
+.exam-matrix-table tr:last-child td { border-bottom: none; }
+
+/* 90º Rotated Matrix Headers */
+.exam-matrix-table th.action-col {
+    position: relative;
+    height: 45px;
+    padding: 0;
+    vertical-align: bottom;
+    min-width: 60px; /* Ensures columns don't squish when scrolling */
+}
+
+.exam-matrix-table .action-label {
+    position: absolute;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%) rotate(180deg);
+    writing-mode: vertical-rl;
+    white-space: nowrap;
+    color: rgba(255, 255, 255, 0.4);
+    font-weight: normal;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-size: 0.75rem;
+}
+
+/* --- THE STICKY LEFT COLUMN --- */
+.exam-matrix-table th:first-child,
+.exam-matrix-table td:first-child {
+    position: sticky;
+    left: 0;
+    backdrop-filter: blur(8px);
+    z-index: 2;
+    border-right: 1px dashed rgba(255, 255, 255, 0.3);
+}
+
+/* Header needs a higher z-index so it stays above the scrolling body cells */
+.exam-matrix-table th:first-child {
+    z-index: 3;
+}
+
+/* Custom Scrollbar for the Modal Container */
+.exam-modal-container::-webkit-scrollbar {
+    width: 6px;
+}
+.exam-modal-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+.exam-modal-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+}
+.exam-modal-container::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
 }

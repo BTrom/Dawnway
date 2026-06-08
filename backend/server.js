@@ -1110,20 +1110,16 @@ function fastForwardSim(ticksToRun, res, wasPaused, targetAgentId) {
     
     orderedNeeds.forEach(need => {
         let bestEffect = 0;
-        let bestActionId = null;
 
         actionsCache.forEach(action => {
-            // Check how much this action satisfies the current need
             const effect = (action.needs_effect && action.needs_effect[need]) ? action.needs_effect[need] : 0;
-            
             if (effect > bestEffect) {
                 bestEffect = effect;
-                bestActionId = action._id.toString();
             }
         });
 
-        dynamicPerfectActions[need] = bestActionId;
-        console.log("Dynamic Perfect Actions Map:", dynamicPerfectActions);
+        // Store the maximum mathematical effect possible for this need
+        dynamicPerfectActions[need] = bestEffect; 
     });
 
     // Fetch the specific agent we are examining
@@ -1160,8 +1156,17 @@ function fastForwardSim(ticksToRun, res, wasPaused, targetAgentId) {
                 if (agentId === targetAgentId) {
                     if (result.actionChanged && result.dominantUrgency && result.chosenActionName) {
                         const need = result.dominantUrgency.toLowerCase();
-                        const expectedActionId = dynamicPerfectActions[need];
-                        const isCorrect = (state.last_action_id === expectedActionId) ? 1 : 0;
+                        
+                        // Get the actual effect the chosen action had on the dominant need
+                        const actualEffect = (state.current_action_obj.needs_effect && state.current_action_obj.needs_effect[need]) 
+                                            ? state.current_action_obj.needs_effect[need] 
+                                            : 0;
+                        const maxPossibleEffect = dynamicPerfectActions[need];
+
+                        let isCorrect = 0;
+                        if (actualEffect > 0 && maxPossibleEffect > 0) {
+                            isCorrect = Math.min(1, actualEffect / maxPossibleEffect);
+                        }
 
                         // Ensure the array exists, push, and trim
                         if (!state.action_history_window) state.action_history_window = [];
