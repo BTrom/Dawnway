@@ -285,7 +285,7 @@ form {
     } to {
         width: var(--form-width);
         height: var(--form-height);
-        padding: 4rem;
+        padding: var(--form-padding);
         left: 50%;
         top:  50%;
         transform: translate(-50%, -50%);
@@ -712,9 +712,11 @@ header div button svg {
     z-index: 1; /* Keep above nebula */
     margin: 0 auto;
     
-    /* REVISED: Transparent background, no blur */
     background: transparent;
     backdrop-filter: none;
+
+    margin-top: 140px;
+    max-width: 600px;
 }
 
 .init-title {
@@ -961,6 +963,18 @@ button.init-submit {
 .init-submit-container:hover .overlay {
     clip-path: rect(-20% 120% 120% -20%);
     box-shadow: 0px 0px 10px #fff8;
+}
+
+#back-to-home {
+    position: absolute;
+    left: -70px; /* Pushes it outside the left edge */
+    top: 105px;   /* Aligns it nicely with the top border of the form */
+    color: #fff;
+    text-decoration: none;
+}
+
+#back-to-home svg {
+    margin: 0; /* Ensures the SVG stays centered inside the icon-btn */
 }
 
 /* --- AGENT SIDEBAR CARDS --- */
@@ -1390,7 +1404,7 @@ button.init-submit {
     transform: translateY(-50%);
     width: 70px;
     background: rgba(0, 0, 0, 0.4);
-    /* backdrop-filter: blur(12px); */
+    backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-right: none;
     border-radius: 1rem 0 0 1rem;
@@ -1541,10 +1555,20 @@ button.admin-round-item svg {
 }
 
 @media (max-width: 900px) {
+    :root {
+        --form-width: 90vw;
+        --form-height: 480px; /* Slightly shorter so it doesn't crowd the screen */
+        --form-padding: 2rem; /* Less padding to give inputs breathing room */
+    }
+
     html, body {
         flex-direction: column;
         overflow-x: hidden;
         overflow-y: auto;
+    }
+
+    h1 {
+        font-size: 2.5rem; 
     }
     
     .mobile-only {
@@ -1564,7 +1588,11 @@ button.admin-round-item svg {
         font-size: 1.25rem; /* Downscaled logo text */
     }
 
-    /* 3.1 Mobile Overlay Side Menu */
+    #content {
+        width: 100%;
+        padding: 0 1.5rem;
+    }
+
     #side-menu {
         position: fixed;
         top: 0;
@@ -1602,7 +1630,6 @@ button.admin-round-item svg {
         font-size: 2.25rem; /* Downscaled Agent Name */
     }
 
-    /* 3.2 HTML Stays Same, CSS Fixes Alignment */
     .profile-header {
         flex-direction: column; 
         align-items: flex-start; /* Pushes everything left, stacking Name above Stats */
@@ -1614,10 +1641,79 @@ button.admin-round-item svg {
         justify-content: space-between; /* Spreads stats nicely across the phone screen */
     }
     
-    /* 3.3 Stack Needs and Emotions vertically */
     .profile-body {
         flex-direction: column; 
         gap: 3rem; 
+    }
+
+    form.auth-form {
+        max-width: 90vw !important;
+        padding: 2rem !important;
+    }
+
+    form label input {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    #close-button {
+        /* Position it centered, just above the form */
+        top: calc(50vh - (var(--form-height) / 2) - 4rem) !important;
+        left: 50vw !important;
+        transform: translateX(-50%) !important;
+        
+        /* Style it like a sleek button (Let your JS continue to handle the opacity/fading!) */
+        width: max-content !important;
+        height: auto !important;
+        padding: 10px 24px !important;
+        border: 1px solid var(--low-white) !important;
+        border-radius: 2rem !important;
+        z-index: 100;
+        opacity: 1 !important;
+    }
+
+    #close-button::before {
+        content: "← Back";
+        color: #fff;
+        font-family: "Elms Sans", sans-serif;
+        font-size: 1rem;
+        font-weight: 300;
+    }
+
+    #aux-bar {
+        display: none !important;
+    }
+
+    #init-card {
+        margin-top: 80px !important; /* Slightly tighter top spacing for phone screens */
+    }
+
+    .init-subtitle {
+        margin-bottom: 1rem !important;
+    }
+
+    #back-to-home {
+        position: static; /* Removes it from the absolute left position */
+        display: flex;
+        margin: 0 auto 0.5rem auto !important; /* Centers it and adds space before the title */
+        width: max-content !important;
+        height: auto !important;
+        padding: 10px 24px !important;
+        border-radius: 2rem !important;
+        /* background: rgba(0, 0, 0, 0.6) !important; */
+    }
+
+    /* Hide the generic SVG arrow */
+    #back-to-home svg {
+        display: none;
+    }
+
+    /* Inject the text */
+    #back-to-home::before {
+        content: "← Back";
+        font-family: "Elms Sans", sans-serif;
+        font-size: 1rem;
+        font-weight: 300;
     }
 }
 

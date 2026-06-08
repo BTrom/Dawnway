@@ -4,26 +4,64 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dawnway Lab - Initialization</title>
-    <link rel="stylesheet" href="CSS/main-style.css">
+    <link rel="stylesheet" href="CSS/main-style.css?v=8.2">
     <link rel="stylesheet" href="CSS/nebula.css">
 </head>
 <body>
     <canvas id="nebula"></canvas>
     
     <header>
-        <h2>Dawnway Lab</h2>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <button id="mobile-menu-toggle" class="mobile-only">
+                <svg viewBox="0 0 24 24" width="28" height="28" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" class="icon-hamburger"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                <svg viewBox="0 0 24 24" width="28" height="28" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" class="icon-close" style="display: none;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <h2>Dawnway Lab</h2>
+        </div>
         <div>
-            <p>php</p>
-            <button>
-                <svg width="800px" height="800px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="9" r="3" stroke="#fffc" stroke-width="0.75"/><circle cx="12" cy="12" r="10" stroke="#fffc" stroke-width="0.75"/><path d="M17.9691 20C17.81 17.1085 16.9247 15 11.9999 15C7.07521 15 6.18991 17.1085 6.03076 20" stroke="#fffc" stroke-width="0.75" stroke-linecap="round"/></svg>
-            </button>
-            <button>
-                <svg width="800px" height="800px" viewBox="0 0 32 32" enable-background="new 0 0 32 32" id="Editable-line" version="1.1" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" fill="none"><circle cx="16" cy="16" fill="none" id="XMLID_224_" r="4" stroke="#fffc" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="1"/><path d=" M27.758,10.366l-1-1.732c-0.552-0.957-1.775-1.284-2.732-0.732L23.5,8.206C21.5,9.36,19,7.917,19,5.608V5c0-1.105-0.895-2-2-2h-2 c-1.105,0-2,0.895-2,2v0.608c0,2.309-2.5,3.753-4.5,2.598L7.974,7.902C7.017,7.35,5.794,7.677,5.242,8.634l-1,1.732 c-0.552,0.957-0.225,2.18,0.732,2.732L5.5,13.402c2,1.155,2,4.041,0,5.196l-0.526,0.304c-0.957,0.552-1.284,1.775-0.732,2.732 l1,1.732c0.552,0.957,1.775,1.284,2.732,0.732L8.5,23.794c2-1.155,4.5,0.289,4.5,2.598V27c0,1.105,0.895,2,2,2h2 c1.105,0,2-0.895,2-2v-0.608c0-2.309,2.5-3.753,4.5-2.598l0.526,0.304c0.957,0.552,2.18,0.225,2.732-0.732l1-1.732 c0.552-0.957,0.225-2.18-0.732-2.732L26.5,18.598c-2-1.155-2-4.041,0-5.196l0.526-0.304C27.983,12.546,28.311,11.323,27.758,10.366z " fill="none" id="XMLID_242_" stroke="#fffc" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="1"/></svg>
-            </button>
+            <p id="nav-username">Loading...</p>
+
+            <div class="dropdown-wrapper">
+                <button id="user-menu-btn" class="header-icon-btn">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="9" r="3" stroke="#fffc" stroke-width="0.75"/><circle cx="12" cy="12" r="10" stroke="#fffc" stroke-width="0.75"/><path d="M17.9691 20C17.81 17.1085 16.9247 15 11.9999 15C7.07521 15 6.18991 17.1085 6.03076 20" stroke="#fffc" stroke-width="0.75" stroke-linecap="round"/></svg>
+                </button>
+                <div id="user-menu" class="dropdown-menu">
+                    <button id="logout-btn" class="dropdown-item danger">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                        Log Out
+                    </button>
+                </div>
+            </div>
+
+            <div class="dropdown-wrapper">
+                <button id="settings-menu-btn" class="header-icon-btn">
+                    <svg viewBox="0 0 32 32" enable-background="new 0 0 32 32" id="Editable-line" version="1.1" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" fill="none"><circle cx="16" cy="16" fill="none" id="XMLID_224_" r="4" stroke="#fffc" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="1"/><path d=" M27.758,10.366l-1-1.732c-0.552-0.957-1.775-1.284-2.732-0.732L23.5,8.206C21.5,9.36,19,7.917,19,5.608V5c0-1.105-0.895-2-2-2h-2 c-1.105,0-2,0.895-2,2v0.608c0,2.309-2.5,3.753-4.5,2.598L7.974,7.902C7.017,7.35,5.794,7.677,5.242,8.634l-1,1.732 c-0.552,0.957-0.225,2.18,0.732,2.732L5.5,13.402c2,1.155,2,4.041,0,5.196l-0.526,0.304c-0.957,0.552-1.284,1.775-0.732,2.732 l1,1.732c0.552,0.957,1.775,1.284,2.732,0.732L8.5,23.794c2-1.155,4.5,0.289,4.5,2.598V27c0,1.105,0.895,2,2,2h2 c1.105,0,2-0.895,2-2v-0.608c0-2.309,2.5-3.753,4.5-2.598l0.526,0.304c0.957,0.552,2.18,0.225,2.732-0.732l1-1.732 c0.552-0.957,0.225-2.18-0.732-2.732L26.5,18.598c-2-1.155-2-4.041,0-5.196l0.526-0.304C27.983,12.546,28.311,11.323,27.758,10.366z " fill="none" id="XMLID_242_" stroke="#fffc" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10" stroke-width="1"/></svg>
+                </button>
+                <div id="settings-menu" class="dropdown-menu">
+                    <h4 class="dropdown-header">GRAPHICS OPTIONS</h4>
+                    <label class="toggle-switch">
+                        <span class="label-text">Nebula Background</span>
+                        <input type="checkbox" id="toggle-nebula" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <label class="toggle-switch">
+                        <span class="label-text">Comet Particles</span>
+                        <input type="checkbox" id="toggle-comets" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
         </div>
     </header>
 
     <div id="init-card">
+        <a href="/home.html" id="back-to-home" class="icon-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="19" y1="12" x2="5" y2="12"></line>
+                <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+        </a>
+
         <h2 class="init-title">Create Character</h2>
         <p class="init-subtitle">Customize biometrics for new agent.</p>
 
@@ -95,6 +133,30 @@
         const slider = document.getElementById('age-slider');
         const ageVal = document.getElementById('age-val');
         const initForm = document.getElementById('character-init-form');
+
+        document.addEventListener("DOMContentLoaded", () => {
+            fetch('/api/me')
+                .then(response => {
+                    if (!response.ok) throw new Error("Not logged in");
+                    return response.json();
+                })
+                .then(data => {
+                    // 1. Core Auth Check
+                    if (!data.authenticated) {
+                        // Using .replace() instead of .href prevents the user from getting stuck in a back-button loop!
+                        window.location.replace('/index.html'); 
+                        return;
+                    }
+
+                    // 2. Setup Standard User UI
+                    const userElement = document.getElementById('nav-username');
+                    if (userElement) userElement.textContent = data.username;
+                })
+                .catch(err => {
+                    console.warn("Authentication failed or server unreachable:", err);
+                    window.location.replace('/index.html');
+                });
+        });
 
         // Update age display on slide
         slider.addEventListener('input', function() {

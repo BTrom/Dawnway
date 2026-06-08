@@ -1,4 +1,4 @@
-const ALPHA = 0.01;   // How fast they learn (Learning Rate)
+const ALPHA = 0.1;   // How fast they learn (Learning Rate)
 
 /**
  * Calculates the total current discomfort of the agent.
@@ -145,10 +145,10 @@ function absorbKnowledge(studentWeights, studentMemory, teacherWeights, teacherM
 
         const teacherStrength = teacherMemory[key] ? teacherMemory[key].strength : 0;
         const studentStrength = studentMemory[key] ? studentMemory[key].strength : 0;
-        const tWeight = teacherWeights[key];
 
         // Only learn if the teacher is more experienced with this specific knowledge
-        if (teacherStrength >= MIN_TEACHER_STRENGTH && teacherStrength > studentStrength + 1.0 && tWeight > 1.0) { // +1.0 threshold prevents swapping negligible differences
+        if (teacherStrength >= MIN_TEACHER_STRENGTH && teacherStrength > studentStrength + 1.0) { // +1.0 threshold prevents swapping negligible differences
+            const tWeight = teacherWeights[key];
             const sWeight = studentWeights[key] || 0;
 
             // Soft Update (Polyak Averaging)
